@@ -1,0 +1,148 @@
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ZENDAJ Smart-Trace — Paleta corporativa
+ * Azul oscuro (principal) · Blanco (base) · Amarillo (acento)
+ */
+@layer base {
+  :root {
+    --background: 210 40% 98%;
+    --foreground: 222 60% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 60% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 60% 11%;
+
+    /* Azul oscuro corporativo */
+    --primary: 222 65% 20%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 220 70% 38%;
+
+    --secondary: 220 30% 95%;
+    --secondary-foreground: 222 60% 11%;
+
+    --muted: 220 25% 95%;
+    --muted-foreground: 220 15% 42%;
+
+    /* Amarillo de acento */
+    --accent: 45 100% 51%;
+    --accent-foreground: 222 60% 11%;
+
+    --destructive: 0 78% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --warning: 38 95% 55%;
+    --warning-foreground: 30 60% 15%;
+
+    --success: 152 60% 38%;
+    --success-foreground: 0 0% 100%;
+
+    --info: 210 90% 45%;
+    --info-foreground: 0 0% 100%;
+
+    --border: 220 20% 88%;
+    --input: 220 20% 90%;
+    --ring: 222 65% 25%;
+
+    --radius: 0.625rem;
+
+    --gradient-primary: linear-gradient(135deg, hsl(222 65% 18%), hsl(220 70% 32%));
+    --gradient-hero: linear-gradient(135deg, hsl(222 70% 10%) 0%, hsl(222 65% 18%) 55%, hsl(220 70% 28%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(45 100% 51%), hsl(40 100% 56%));
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%), hsl(220 30% 98%));
+
+    --shadow-elegant: 0 10px 40px -12px hsl(222 65% 20% / 0.25);
+    --shadow-glow: 0 0 50px hsl(45 100% 51% / 0.35);
+    --shadow-card: 0 1px 2px hsl(220 30% 30% / 0.05), 0 4px 18px -8px hsl(220 30% 30% / 0.08);
+
+    /* Sidebar — azul oscuro corporativo */
+    --sidebar-background: 222 70% 12%;
+    --sidebar-foreground: 220 20% 78%;
+    --sidebar-primary: 45 100% 51%;
+    --sidebar-primary-foreground: 222 60% 11%;
+    --sidebar-accent: 222 55% 18%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 222 55% 18%;
+    --sidebar-ring: 45 100% 51%;
+  }
+
+  .dark {
+    --background: 222 60% 8%;
+    --foreground: 220 15% 95%;
+    --card: 222 50% 11%;
+    --card-foreground: 220 15% 95%;
+    --popover: 222 50% 11%;
+    --popover-foreground: 220 15% 95%;
+    --primary: 220 70% 55%;
+    --primary-foreground: 222 60% 8%;
+    --secondary: 222 40% 15%;
+    --secondary-foreground: 220 15% 95%;
+    --muted: 222 40% 15%;
+    --muted-foreground: 220 15% 65%;
+    --accent: 45 100% 55%;
+    --accent-foreground: 222 60% 8%;
+    --border: 222 40% 18%;
+    --input: 222 40% 18%;
+    --ring: 45 100% 55%;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  html { font-family: 'Inter', system-ui, sans-serif; }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+  h1, h2, h3, h4, h5 { font-family: 'Sora', sans-serif; letter-spacing: -0.02em; }
+}
+
+@layer utilities {
+  .font-display { font-family: 'Sora', sans-serif; }
+  .bg-gradient-primary { background: var(--gradient-primary); }
+  .bg-gradient-hero { background: var(--gradient-hero); }
+  .bg-gradient-accent { background: var(--gradient-accent); }
+  .bg-gradient-card { background: var(--gradient-card); }
+  .shadow-elegant { box-shadow: var(--shadow-elegant); }
+  .shadow-glow { box-shadow: var(--shadow-glow); }
+  .shadow-card { box-shadow: var(--shadow-card); }
+  .text-gradient {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .grid-pattern {
+    background-image:
+      linear-gradient(hsl(var(--border) / 0.4) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--border) / 0.4) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+  .glow-dot::before {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 9999px;
+    background: hsl(var(--success) / 0.4);
+    animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+}
+
+@keyframes ping {
+  75%, 100% { transform: scale(2); opacity: 0; }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-float { animation: float 6s ease-in-out infinite; }
+.animate-fade-in { animation: fade-in 0.4s ease-out; }
