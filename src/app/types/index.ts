@@ -20,17 +20,17 @@ export interface Vehicle {
 }
 
 export interface Sale {
-  id: string;
-  productCode: string;
-  productName: string;
+  id: string; 
+  product_code: string;
+  product_name: string;
   category: string;
   brand: string;
   model: string;
-  purchaseDate: string;
+  purchase_date: string;
   invoice: string;
-  clientId: string;
-  clientName: string;
-  vehicle: Vehicle;
+  client_id: string;
+  client_name: string;
+  vehicle: string;
   amount: number;
 }
 
@@ -40,50 +40,48 @@ export type WarrantyStatus = 'pendiente' | 'en_revision' | 'observado' | 'valida
 
 export interface Evidence {
   id: string;
-  caseId: string;
+  case_id: string;
   name: string;
   type: 'foto' | 'comprobante' | 'documento' | 'video';
   size: number;
-  uploadedAt: string;
+  uploaded_at: string;
   uploadedBy: string;
-  url?: string;
   comment?: string;
+  url?: string; 
+  files?: { name: string; url: string }[];
 }
 
 export interface HistoryEntry {
   id: string;
-  caseId: string;
+  case_id: string;
   date: string;
   user: string;
-  role: Role;
+  role: any;
   action: string;
-  fromStatus?: CaseStatus;
-  toStatus?: CaseStatus;
   comment?: string;
+  user_name?: string;  
+  user_role?: string;  
+  to_status?: string;  
+  created_at?: string; 
 }
 
 export interface Case {
   id: string;
   code: string;
-  date: string;
-  clientId: string;
-  clientName: string;
-  saleId: string;
-  productName: string;
-  failureType: string;
+  client_id: string;
+  client_name: string;
+  sale_id: string;
+  product_name: string;
+  failure_type: string;
   description: string;
   observations: string;
   invoice: string;
   mileage: number;
   priority: Priority;
-  status: CaseStatus;
-  warrantyStatus: WarrantyStatus;
-  warrantyChecklist?: { label: string; checked: boolean }[];
+  warranty_status: string;
+  warrantyStatus?: WarrantyStatus;
   technicalDecision?: string;
-  finalResult?: string;
-  assignedTo?: string;
-  createdBy: string;
-  closedAt?: string;
+  warrantyChecklist?: any[];
 }
 
 export interface FailureType { id: string; name: string; severity: 'baja'|'media'|'alta'; active: boolean; }

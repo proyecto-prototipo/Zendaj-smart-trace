@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Plus, Search, Pencil, Power } from 'lucide-react';
 import { useData } from '@/app/data/useData';
 import { Role, User } from '@/app/types';
@@ -18,7 +18,7 @@ import { formatDate } from '@/app/format/format';
 const blank: Omit<User, 'id' | 'createdAt'> = { name: '', email: '', document: '', phone: '', role: 'cliente', type: 'cliente', active: true };
 
 const UsersPage = () => {
-  const { users, addUser, updateUser, toggleUserActive } = useData();
+const { users, addUser, updateUser, toggleUserActive, fetchData } = useData();
   const [q, setQ] = useState('');
   const [roleF, setRoleF] = useState<string>('all');
   const [typeF, setTypeF] = useState<string>('all');
@@ -26,6 +26,11 @@ const UsersPage = () => {
   const [editing, setEditing] = useState<User | null>(null);
   const [form, setForm] = useState(blank);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const filtered = useMemo(() => users.filter(u => {
     const m = q.toLowerCase().trim();
@@ -48,11 +53,23 @@ const UsersPage = () => {
     return Object.keys(e).length === 0;
   };
 
-  const submit = () => {
+  const submit = async () => {
     if (!validate()) return;
-    if (editing) { updateUser(editing.id, form); toast.success('Usuario actualizado'); }
-    else { addUser(form); toast.success('Usuario creado'); }
-    setOpen(false);
+    setLoading(true);
+    try {
+      if (editing) {
+        await updateUser(editing.id, form);
+        toast.success('Usuario actualizado en la nube');
+      } else {
+        await addUser(form);
+        toast.success('Usuario creado en la nube');
+      }
+      setOpen(false);
+    } catch (error) {
+      toast.error('Error al conectar con la base de datos');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -78,16 +95,13 @@ const UsersPage = () => {
             <SelectTrigger className="w-52"><SelectValue placeholder="Rol" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos los roles</SelectItem>
-              <SelectItem value="interno">Administrador</SelectItem>
-              <SelectItem value="cliente">Asesor</SelectItem>
-              <SelectItem value="interno">Cliente</SelectItem>
-              <SelectItem value="cliente">Gerencia</SelectItem>
-              <SelectItem value="cliente">Técnico</SelectItem>
               {Object.entries(roleLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
 
+
+        <div className="max-h-[500px] overflow-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -118,7 +132,7 @@ const UsersPage = () => {
                 <TableCell className="text-sm text-muted-foreground">{formatDate(u.createdAt)}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
-                    <Switch checked={u.active} onCheckedChange={() => { toggleUserActive(u.id); toast.success(`Usuario ${u.active ? 'desactivado' : 'activado'}`); }} />
+                    <Switch checked={u.active} onCheckedChange={async () => { await toggleUserActive(u.id); toast.success('Estado actualizado'); }} />
                     <span className={`text-xs ${u.active ? 'text-success' : 'text-muted-foreground'}`}>{u.active ? 'Activo' : 'Inactivo'}</span>
                   </div>
                 </TableCell>
@@ -130,6 +144,8 @@ const UsersPage = () => {
             ))}
           </TableBody>
         </Table>
+        </div>
+        
         <div className="p-3 border-t text-xs text-muted-foreground">{filtered.length} de {users.length} registros</div>
       </div>
 
@@ -182,7 +198,9 @@ const UsersPage = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={submit} className="bg-gradient-primary text-primary-foreground">{editing ? 'Guardar cambios' : 'Crear registro'}</Button>
+            <Button onClick={submit} disabled={loading} className="bg-gradient-primary text-primary-foreground">
+              {loading ? 'Procesando...' : (editing ? 'Guardar cambios' : 'Crear registro')}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback } from '@/app/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/app/ui/dropdown-menu';
 import { cn } from '@/app/lib/utils';
 import { toast } from 'sonner';
+import logo  from '@/public/logo.png';
 
 export const AppLayout = () => {
   const session = useAuth(s => s.session);
@@ -31,9 +32,12 @@ export const AppLayout = () => {
       {/* Sidebar */}
       <aside className="hidden lg:flex w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
         <Link to="/app/dashboard" className="flex items-center gap-3 px-5 h-16 border-b border-sidebar-border shrink-0">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent shadow-glow shrink-0">
-            <Activity className="h-5 w-5 text-accent-foreground" />
-          </div>
+          <img 
+            src="/logo.png" 
+            alt="Logo" 
+            className="h-9 w-9 object-contain" // 'object-contain' evita que se corte
+            onError={(e) => (e.currentTarget.style.display = 'none')} // Si falla, no muestra el icono roto
+          />
           <div className="leading-tight">
             <p className="font-display text-sm font-bold text-white">ZENDAJ</p>
             <p className="text-[10px] uppercase tracking-[0.2em] text-sidebar-foreground/60">Smart-Trace</p>
@@ -78,7 +82,7 @@ export const AppLayout = () => {
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 flex items-center gap-4 px-4 lg:px-8 border-b bg-card/80 backdrop-blur sticky top-0 z-30">
           <div className="lg:hidden flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary shrink-0"><Activity className="h-4 w-4 text-primary-foreground" /></div>
+            <img src="/logo.png" alt="Logo" className="h-8 w-8 object-contain" />
             <span className="font-display font-bold">ZENDAJ</span>
           </div>
           <div className="hidden md:flex items-center text-sm text-muted-foreground">

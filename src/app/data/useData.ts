@@ -1,8 +1,10 @@
+import { supabase } from '@/lib/supabase';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Case, CaseStatus, Evidence, FailureType, HistoryEntry, Sale, StatusConfig, User, WarrantyStatus } from '@/app/types';
 import { initialUsers } from '@/app/mocks/mockUsers';
 import { failureTypes, initialCases, initialEvidences, initialHistory, initialSales, statusConfigs } from '@/app/mocks/mockData';
+import { toast } from 'sonner';
 
 interface DataStore {
   users: User[];
@@ -14,24 +16,26 @@ interface DataStore {
   statuses: StatusConfig[];
 
   // users
-  addUser: (u: Omit<User, 'id' | 'createdAt'>) => void;
-  updateUser: (id: string, u: Partial<User>) => void;
-  toggleUserActive: (id: string) => void;
+  fetchData: () => Promise<void>;
+  addUser: (u: Omit<User, 'id' | 'createdAt'>) => Promise<void>;
+  updateUser: (id: string, u: Partial<User>) => Promise<void>;
+  toggleUserActive: (id: string) => Promise<void>;
 
   // sales
   addSale: (s: Omit<Sale, 'id'>) => void;
   updateSale: (id: string, s: Partial<Sale>) => void;
 
   // cases
-  addCase: (c: Omit<Case, 'id' | 'code' | 'status' | 'warrantyStatus'>, actor: { name: string; role: any }) => Case;
-  updateCaseStatus: (id: string, status: CaseStatus, actor: { name: string; role: any }, comment?: string) => void;
+  // En tu interfaz DataStore:
+  addCase: (c: Omit<Case, 'id'> , actor: { name: string; role: any }) => Promise<Case | null>;
+  updateCaseStatus: (id: string, status: CaseStatus) => void;
   updateWarranty: (id: string, warrantyStatus: WarrantyStatus, decision: string, checklist: { label: string; checked: boolean }[], actor: { name: string; role: any }) => void;
   closeCase: (id: string, finalResult: string, actor: { name: string; role: any }) => void;
   addCaseComment: (id: string, comment: string, actor: { name: string; role: any }) => void;
 
   // evidences
   addEvidence: (e: Omit<Evidence, 'id' | 'uploadedAt'>) => void;
-  removeEvidence: (id: string) => void;
+  removeEvidence: (id: string, files: any[]) => Promise<void>;
   commentEvidence: (id: string, comment: string) => void;
 
   // config
@@ -42,12 +46,6 @@ interface DataStore {
 
   reset: () => void;
 }
-
-const generateCaseCode = (cases: Case[]) => {
-  const year = new Date().getFullYear();
-  const num = (cases.length + 1).toString().padStart(4, '0');
-  return `ZDJ-${year}-${num}`;
-};
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const now = () => new Date().toISOString();
@@ -63,38 +61,202 @@ export const useData = create<DataStore>()(
       failureTypes,
       statuses: statusConfigs,
 
-      addUser: (u) => set((s) => ({ users: [{ ...u, id: uid(), createdAt: now().slice(0, 10) }, ...s.users] })),
-      updateUser: (id, u) => set((s) => ({ users: s.users.map(x => x.id === id ? { ...x, ...u } : x) })),
-      toggleUserActive: (id) => set((s) => ({ users: s.users.map(x => x.id === id ? { ...x, active: !x.active } : x) })),
+      fetchSales: async () => {
+        const { data } = await supabase.from('sales').select('*');
+        if (data) set({ sales: data });
+      },
 
-      addSale: (sale) => set((s) => ({ sales: [{ ...sale, id: uid() }, ...s.sales] })),
+      fetchCases: async () => {
+        const { data } = await supabase.from('cases').select('*');
+        console.log("Datos cargados de Supabase:", data); // <--- MIRA LA CONSOLA
+        if (data) set({ cases: data });
+      },
+
+      // PATRÓN DE ADD:
+      addSale: async (s) => {
+        // 1. Enviar a Supabase
+        const dataToInsert = {
+          product_code: s.product_code,
+          product_name: s.product_name,
+          category: s.category,
+          brand: s.brand,
+          model: s.model,
+          purchase_date: s.purchase_date,
+          invoice: s.invoice,
+          client_id: s.client_id,
+          client_name: s.client_name,
+          vehicle: s.vehicle,
+          amount: s.amount
+        };
+        console.log("Enviando a Supabase:", dataToInsert);
+
+        const { data, error } = await supabase
+          .from('sales')
+          .insert([dataToInsert])
+          .select()
+          .single();
+
+        if (error) {
+          console.error("ERROR DETALLADO DE SUPABASE:", error); 
+          toast.error(`Error: ${error.message} (Detalle: ${error.details})`);
+          return;
+        }
+        // 3. Si no hay error, actualizar el estado local
+        set((state) => ({ sales: [data, ...state.sales] }));
+        toast.success("Registro guardado en la nube");
+      },
+
+
+      fetchData: async () => {
+        // Función auxiliar para cargar tablas sin que una detenga a la otra
+        const safeFetch = async (table: string) => {
+          const { data, error } = await supabase.from(table).select('*');
+          if (error) console.error(`Error cargando ${table}:`, error);
+          return data ?? [];
+        };
+
+        const [users, sales, cases, evidences, dbHistory] = await Promise.all([
+          safeFetch('users'),
+          safeFetch('sales'),
+          safeFetch('cases'),
+          safeFetch('evidences'),
+          safeFetch('case_history')
+        ]);
+
+        set({ users, sales, cases, evidences, history: [...initialHistory, ...dbHistory] });
+      },
+
+      addUser: async (u) => {
+        const { data, error } = await supabase
+          .from('users')
+          .insert([{ ...u }])
+          .select('*, createdAt:created_at') // Importante seleccionar el campo renombrado
+          .single();
+
+        if (error) { toast.error('Error al guardar'); return; }
+        set((s) => ({ users: [data, ...s.users] }));
+      },
+
+      updateUser: async (id, u) => {
+        const { error } = await supabase.from('users').update(u).eq('id', id);
+        if (error) { toast.error('Error al actualizar'); return; }
+        set((s) => ({ users: s.users.map(x => x.id === id ? { ...x, ...u } : x) }));
+      },
+
+      toggleUserActive: async (id) => {
+        const user = get().users.find(u => u.id === id);
+        if (!user) return;
+        const newStatus = !user.active;
+        await supabase.from('users').update({ active: newStatus }).eq('id', id);
+        set((s) => ({ users: s.users.map(x => x.id === id ? { ...x, active: newStatus } : x) }));
+      },
+
       updateSale: (id, sale) => set((s) => ({ sales: s.sales.map(x => x.id === id ? { ...x, ...sale } : x) })),
 
-      addCase: (c, actor) => {
-        const code = generateCaseCode(get().cases);
-        const newCase: Case = { ...c, id: uid(), code, status: 'recibido', warrantyStatus: 'pendiente' };
-        const entry: HistoryEntry = { id: uid(), caseId: newCase.id, date: now(), user: actor.name, role: actor.role, action: 'Caso creado', toStatus: 'recibido', comment: 'Reclamo registrado en el sistema' };
-        set((s) => ({ cases: [newCase, ...s.cases], history: [entry, ...s.history] }));
-        return newCase;
+      addCase: async (c, actor) => {
+        const code = `CAS-${Math.floor(1000 + Math.random() * 9000)}`;
+
+        const caseToInsert = {
+          code,
+          client_id: c.client_id,
+          client_name: c.client_name,
+          sale_id: c.sale_id,
+          product_name: c.product_name,
+          failure_type: c.failure_type,
+          description: c.description,
+          observations: c.observations,
+          invoice: c.invoice,
+          mileage: c.mileage,
+          priority: c.priority,
+          created_by: actor.name
+        };
+
+        const { data, error } = await supabase
+          .from('cases')
+          .insert([caseToInsert])
+          .select('*')
+          .single();
+
+        if (error) {
+          console.error("Error Supabase:", error);
+          return null;
+        }
+
+        set((s) => ({ cases: [data, ...s.cases] }));
+        toast.success("Caso registrado con éxito");
+        return data; 
       },
 
-      updateCaseStatus: (id, status, actor, comment) => {
-        const current = get().cases.find(c => c.id === id);
-        if (!current) return;
-        const entry: HistoryEntry = { id: uid(), caseId: id, date: now(), user: actor.name, role: actor.role, action: `Cambio de estado a ${status}`, fromStatus: current.status, toStatus: status, comment };
-        set((s) => ({
-          cases: s.cases.map(c => c.id === id ? { ...c, status } : c),
-          history: [entry, ...s.history],
-        }));
+
+      updateCaseStatus: async (id, status) => {
+
+        const { error } = await supabase
+          .from('cases')
+          .update({ 
+            status: status, 
+          })
+          .eq('id', id);
+
+        if (error) {
+          console.error("Error al actualizar estado:", error);
+          toast.error("Error al actualizar en la base de datos");
+          return;
+        }
+
+        await get().fetchData();
       },
 
-      updateWarranty: (id, warrantyStatus, decision, checklist, actor) => {
-        const entry: HistoryEntry = { id: uid(), caseId: id, date: now(), user: actor.name, role: actor.role, action: `Validación de garantía: ${warrantyStatus}`, comment: decision };
-        set((s) => ({
-          cases: s.cases.map(c => c.id === id ? { ...c, warrantyStatus, technicalDecision: decision, warrantyChecklist: checklist, status: warrantyStatus === 'validado' ? 'validado' : warrantyStatus === 'rechazado' ? 'rechazado' : warrantyStatus === 'observado' ? 'observado' : 'en_revision' } : c),
-          history: [entry, ...s.history],
-        }));
+      addCaseComment: async (id, comment, actor) => {
+
+        const { error } = await supabase
+          .from('case_history') 
+          .insert([{
+            case_id: id,            // Debe ser UUID
+            action: 'Comentario añadido',
+            user_name: actor.name,
+            user_role: actor.role,
+            comment: comment
+          }]);
+
+        if (error) {
+          console.error("ERROR AL GUARDAR:", error.message);
+          toast.error("Error de base de datos: " + error.message);
+          return;
+        }
+
+        await get().fetchData(); 
       },
+
+      updateWarranty: async (id, status, decision, checklist, user) => {
+        console.log("Enviando a Supabase:", { status, decision, checklist }); // <--- MIRA ESTO
+       let newStatus: CaseStatus = 'en_revision'; 
+       if (status === 'validado') newStatus = 'validado';
+       if (status === 'rechazado') newStatus = 'resuelto';
+
+        const { error } = await supabase
+          .from('cases')
+          .update({
+
+            warranty_status: status,  
+            status: newStatus,      
+            technicalDecision: decision,   
+            warrantyChecklist: checklist,  
+            warranty_updated_at: new Date().toISOString()
+          })
+          .eq('id', id)
+          .select();
+
+        if (error) {
+          console.error("Error al actualizar:", error);
+          toast.error("Error BD: " + error.message);
+        } else {
+          console.log("Guardado exitoso");
+          
+          await get().fetchData(); 
+          toast.success("Cambios guardados");
+        }
+      },
+
 
       closeCase: (id, finalResult, actor) => {
         if (!finalResult.trim()) return;
@@ -107,14 +269,84 @@ export const useData = create<DataStore>()(
         }));
       },
 
-      addCaseComment: (id, comment, actor) => {
-        const entry: HistoryEntry = { id: uid(), caseId: id, date: now(), user: actor.name, role: actor.role, action: 'Comentario añadido', comment };
-        set((s) => ({ history: [entry, ...s.history] }));
+
+      addEvidence: async (e) => {
+        const dataToInsert = {
+          case_id: e.caseId,
+          name: e.name,
+          type: e.type,
+          size: e.size,
+          uploaded_by: e.uploadedBy,
+          uploaded_at: e.uploaded_at,
+          comment: e.comment,
+          files: e.files
+        };
+
+        console.log("Datos que estoy enviando a Supabase:", dataToInsert);
+
+        const { data, error } = await supabase
+          .from('evidences')
+          .insert([dataToInsert])
+          .select()
+          .single();
+
+        if (error) {
+          console.error("--- ERROR CRÍTICO DE SUPABASE ---");
+          console.error(error.message);
+          console.error(error.details);
+          console.error(error.hint);
+          toast.error("Error BD: " + error.message);
+          return;
+        }
+
+        console.log("Respuesta de Supabase:", data);
+        set((s) => ({ evidences: [data, ...s.evidences] }));
       },
 
-      addEvidence: (e) => set((s) => ({ evidences: [{ ...e, id: uid(), uploadedAt: now().slice(0, 10) }, ...s.evidences] })),
-      removeEvidence: (id) => set((s) => ({ evidences: s.evidences.filter(e => e.id !== id) })),
-      commentEvidence: (id, comment) => set((s) => ({ evidences: s.evidences.map(e => e.id === id ? { ...e, comment } : e) })),
+      removeEvidence: async (id: string, files: any[]) => {
+        try {
+          // 1. Borrado de archivos físicos
+          if (files && files.length > 0) {
+            const paths = files.map(f => f.url.split('/').pop());
+            const { error: storageError } = await supabase.storage.from('evidencias').remove(paths);
+            if (storageError) console.error("Error borrando archivos:", storageError);
+          }
+
+          // 2. Borrado de base de datos
+          const { error: dbError } = await supabase
+            .from('evidences')
+            .delete()
+            .eq('id', id);
+
+          if (dbError) {
+            throw new Error(`Error en DB: ${dbError.message}`);
+          }
+
+          // 3. Solo si NO hubo error en DB, actualizamos el estado
+          set((s) => ({ evidences: s.evidences.filter(e => e.id !== id) }));
+          
+        } catch (err) {
+          console.error("Fallo al eliminar:", err);
+          toast.error("No se pudo eliminar de la base de datos. Revisa tus permisos RLS.");
+        }
+      },
+      
+      commentEvidence: async (id: string, comment: string) => {
+        const { error } = await supabase
+          .from('evidences')
+          .update({ comment: comment }) 
+          .eq('id', id);
+
+        if (error) {
+          console.error("Error al guardar comentario en Supabase:", error);
+          toast.error("No se pudo guardar el comentario");
+          return;
+        }
+
+        set((s) => ({ 
+          evidences: s.evidences.map(e => e.id === id ? { ...e, comment } : e) 
+        }));
+      },
 
       addFailureType: (name, severity) => set((s) => ({ failureTypes: [{ id: uid(), name, severity, active: true }, ...s.failureTypes] })),
       toggleFailureType: (id) => set((s) => ({ failureTypes: s.failureTypes.map(f => f.id === id ? { ...f, active: !f.active } : f) })),
@@ -127,6 +359,13 @@ export const useData = create<DataStore>()(
         failureTypes, statuses: statusConfigs,
       }),
     }),
-    { name: 'zendaj-data', version: 2 }
+    { 
+      name: 'zendaj-data', 
+      version: 3,
+      migrate: (persistedState: any, version: number) => {
+        if (version < 3) return { ...persistedState, version: 3 };
+        return persistedState;
+      }
+    }
   )
 );

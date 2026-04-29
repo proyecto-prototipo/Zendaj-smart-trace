@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Send, CheckCircle2, AlertCircle, Search } from 'lucide-react';
 import { useData } from '@/app/data/useData';
@@ -31,7 +31,7 @@ const TrazabilidadPage = () => {
   const [finalResult, setFinalResult] = useState('');
 
   if (!id) {
-    const filtered = cases.filter(c => !q || `${c.code} ${c.clientName} ${c.productName}`.toLowerCase().includes(q.toLowerCase()));
+    const filtered = cases.filter(c => !q || `${c.code} ${c.client_name} ${c.product_name}`.toLowerCase().includes(q.toLowerCase()));
     return (
       <>
         <PageHeader kicker="Módulo 6" title="Seguimiento y trazabilidad" description="Cada caso conserva su historial completo. Nada se borra." />
@@ -42,10 +42,10 @@ const TrazabilidadPage = () => {
             <TableBody>{filtered.map(c => (
               <TableRow key={c.id} className="hover:bg-muted/40 cursor-pointer" onClick={() => nav(`/app/trazabilidad/${c.id}`)}>
                 <TableCell><span className="font-mono text-xs font-semibold text-primary">{c.code}</span></TableCell>
-                <TableCell className="text-sm">{c.clientName}</TableCell>
-                <TableCell className="text-sm">{c.productName}</TableCell>
+                <TableCell className="text-sm">{c.client_name}</TableCell>
+                <TableCell className="text-sm">{c.product_name}</TableCell>
                 <TableCell><StatusBadge status={c.status} /></TableCell>
-                <TableCell><WarrantyBadge status={c.warrantyStatus} /></TableCell>
+                <TableCell><WarrantyBadge status={c.warranty_status || c.warrantyStatus} /></TableCell>
                 <TableCell className="text-sm text-muted-foreground">{formatDate(c.date)}</TableCell>
                 <TableCell><Button size="sm" variant="outline">Ver</Button></TableCell>
               </TableRow>
@@ -58,13 +58,15 @@ const TrazabilidadPage = () => {
 
   const c = cases.find(x => x.id === id);
   if (!c) return <div className="p-8">Caso no encontrado. <Link to="/app/trazabilidad" className="text-primary">Volver</Link></div>;
-  const evList = evidences.filter(e => e.caseId === c.id);
-  const hist = history.filter(h => h.caseId === c.id).sort((a,b) => +new Date(b.date) - +new Date(a.date));
+  const evList = evidences.filter(e => e.case_id === c.id);
+  const hist = history.filter(h => (h.case_id === c.id || h.case_id === c.id))
+                    .sort((a,b) => +new Date(b.date || b.created_at) - +new Date(a.date || a.created_at));
   const canManage = session.role !== 'cliente' && session.role !== 'gerencia';
 
-  const onChangeStatus = () => {
-    if (!statusChange) return;
-    updateCaseStatus(c.id, statusChange, { name: session.name, role: session.role }, comment || undefined);
+  const onChangeStatus = async () => {
+    if (!statusChange) return;   
+    await updateCaseStatus(c.id, statusChange || undefined);
+    await addCaseComment(c.id, comment, { name: session.name, role: session.role });
     toast.success(`Estado cambiado a ${statusChange}`);
     setStatusChange(''); setComment('');
   };
@@ -88,7 +90,7 @@ const TrazabilidadPage = () => {
   return (
     <>
       <Link to="/app/trazabilidad" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4"><ArrowLeft className="h-4 w-4 mr-1" />Volver</Link>
-      <PageHeader kicker={c.code} title={c.productName} description={`Reclamo de ${c.clientName} · ${c.failureType}`}
+      <PageHeader kicker={c.code} title={c.product_name} description={`Reclamo de ${c.client_name} · ${c.failure_type}`}
         actions={<><StatusBadge status={c.status} /><PriorityBadge priority={c.priority} /><WarrantyBadge status={c.warrantyStatus} /></>} />
 
       {/* Stepper */}
@@ -131,17 +133,29 @@ const TrazabilidadPage = () => {
             <div className="relative pl-6 space-y-5">
               <div className="absolute left-2 top-2 bottom-2 w-px bg-border" />
               {hist.map(h => (
-                <div key={h.id} className="relative">
+                <div key={h.id}  className="relative">
                   <div className="absolute -left-[18px] top-1 h-3 w-3 rounded-full bg-gradient-primary ring-4 ring-background" />
                   <div className="flex flex-wrap items-center gap-2 mb-1">
                     <p className="text-sm font-semibold">{h.action}</p>
-                    {h.toStatus && <StatusBadge status={h.toStatus} />}
+                    {(h.toStatus || (h as any).to_status) && (
+                      <StatusBadge status={(h.toStatus || (h as any).to_status) as CaseStatus} />
+                    )}
                   </div>
                   {h.comment && <p className="text-sm text-muted-foreground">{h.comment}</p>}
                   <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                    <Avatar className="h-5 w-5"><AvatarFallback className="text-[9px] bg-secondary">{h.user.split(' ').map(s=>s[0]).slice(0,2).join('')}</AvatarFallback></Avatar>
-                    <span>{h.user} · {roleLabels[h.role]}</span>
-                    <span>·</span><span>{formatDateTime(h.date)}</span>
+                    <Avatar className="h-5 w-5">
+                    <AvatarFallback className="text-[9px] bg-secondary">
+                      {((h.user || (h as any).user_name || 'U') as string)
+                        .split(' ')
+                        .map(s => s[0])
+                        .slice(0, 2)
+                        .join('')}
+                    </AvatarFallback>
+                    </Avatar>
+
+                    <span>{h.user || (h as any).user_name} · {roleLabels[h.role || (h as any).user_role]}</span>
+                    <span>·</span>
+                    <span>{formatDateTime(h.date || (h as any).created_at)}</span>
                   </div>
                 </div>
               ))}

@@ -25,9 +25,17 @@ export const warrantyMeta: Record<WarrantyStatus, { label: string; classes: stri
   rechazado:   { label: 'Rechazado',    classes: 'bg-destructive/10 text-destructive border-destructive/30' },
 };
 
-export const formatDate = (iso: string) => {
-  const d = new Date(iso);
-  return d.toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' });
+export const formatDate = (dateString: string) => {
+  if (!dateString || dateString === 'Invalid Date') return 'N/A';
+  
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return 'N/A'; // Validación extra
+  
+  return date.toLocaleDateString('es-PE', { 
+    day: '2-digit', 
+    month: '2-digit', 
+    year: 'numeric' 
+  });
 };
 
 export const formatDateTime = (iso: string) => {

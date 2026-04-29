@@ -23,6 +23,7 @@ const defaultChecklist = [
   { label: 'Evidencia técnica suficiente', checked: false },
 ];
 
+
 const WarrantyPage = () => {
   const { id } = useParams();
   const nav = useNavigate();
@@ -31,8 +32,12 @@ const WarrantyPage = () => {
   const [q, setQ] = useState('');
 
   if (!id) {
-    const list = cases.filter(c => ['pendiente','en_revision','observado'].includes(c.warrantyStatus));
-    const filtered = list.filter(c => !q || `${c.code} ${c.clientName} ${c.productName}`.toLowerCase().includes(q.toLowerCase()));
+    // Prueba esto: usa el guion bajo si así está en tu base de datos
+    const list = cases.filter(c => ['pendiente', 'en_revision', 'observado', 'validado'].includes(c.warranty_status || c.warranty_status));
+
+    console.log("Casos totales en memoria:", cases);
+    console.log("Casos filtrados para garantía:", list);
+    const filtered = list.filter(c => !q || `${c.code} ${c.client_name} ${c.product_name}`.toLowerCase().includes(q.toLowerCase()));
     return (
       <>
         <PageHeader kicker="Módulo 5" title="Validación de garantía" description="Casos pendientes de evaluación técnica." />
@@ -41,18 +46,20 @@ const WarrantyPage = () => {
           <Table>
             <TableHeader><TableRow><TableHead>Código</TableHead><TableHead>Cliente</TableHead><TableHead>Producto</TableHead><TableHead>Falla</TableHead><TableHead>Prioridad</TableHead><TableHead>Garantía</TableHead><TableHead></TableHead></TableRow></TableHeader>
             <TableBody>
-              {filtered.length === 0 && <TableRow><TableCell colSpan={7} className="text-center py-12 text-muted-foreground">Sin casos pendientes</TableCell></TableRow>}
-              {filtered.map(c => (
+              {filtered.length === 0 ? <TableRow><TableCell colSpan={7} className="text-center py-12 text-muted-foreground">Sin casos pendientes</TableCell></TableRow> :
+              filtered.map(c => {
+                return (
                 <TableRow key={c.id} className="hover:bg-muted/40">
                   <TableCell><span className="font-mono text-xs font-semibold text-primary">{c.code}</span></TableCell>
-                  <TableCell className="text-sm">{c.clientName}</TableCell>
-                  <TableCell className="text-sm">{c.productName}</TableCell>
-                  <TableCell className="text-sm">{c.failureType}</TableCell>
+                  <TableCell className="text-sm">{c.client_name}</TableCell>
+                  <TableCell className="text-sm">{c.product_name}</TableCell>
+                  <TableCell className="text-sm">{c.failure_type}</TableCell>
                   <TableCell><PriorityBadge priority={c.priority} /></TableCell>
-                  <TableCell><WarrantyBadge status={c.warrantyStatus} /></TableCell>
+                  <TableCell><WarrantyBadge status={c.warranty_status || 'pendiente'} /></TableCell>
                   <TableCell><Button size="sm" onClick={() => nav(`/app/garantias/${c.id}`)}>Evaluar</Button></TableCell>
                 </TableRow>
-              ))}
+                )
+              })}
             </TableBody>
           </Table>
         </div>
@@ -62,7 +69,23 @@ const WarrantyPage = () => {
 
   const c = cases.find(x => x.id === id);
   if (!c) return <div className="p-8">Caso no encontrado <Link to="/app/garantias" className="text-primary">Volver</Link></div>;
-  return <WarrantyDetail caseData={c} evidencesCount={evidences.filter(e => e.caseId === c.id).length} sale={sales.find(s => s.id === c.saleId)} onSave={(ws, dec, ck) => { updateWarranty(c.id, ws, dec, ck, { name: session.name, role: session.role }); toast.success('Decisión registrada'); nav('/app/garantias'); }} />;
+  return (
+    <WarrantyDetail 
+      caseData={c} 
+      evidencesCount={evidences.filter(e => e.case_id === c.id).length} 
+      sale={sales.find(s => s.id === c.sale_id) || {}} 
+      onSave={async (ws, dec, ck) => { 
+        try {
+          await updateWarranty(c.id, ws, dec, ck, { name: session.name, role: session.role });
+          toast.success('Decisión registrada'); 
+          nav('/app/garantias');
+        } catch (err) {
+          console.error("Error en onSave:", err);
+          toast.error("Fallo al guardar, revisa la consola.");
+        }
+      }}
+    />
+  );
 };
 
 const WarrantyDetail = ({ caseData, evidencesCount, sale, onSave }: { caseData: Case; evidencesCount: number; sale?: any; onSave: (ws: WarrantyStatus, decision: string, checklist: any[]) => void }) => {
@@ -70,7 +93,13 @@ const WarrantyDetail = ({ caseData, evidencesCount, sale, onSave }: { caseData: 
   const [checklist, setChecklist] = useState(caseData.warrantyChecklist || defaultChecklist);
 
   const action = (ws: WarrantyStatus) => {
-    if (!decision.trim()) { toast.error('Debes registrar tu observación técnica'); return; }
+    console.log("Acción ejecutada:", ws);
+    console.log("Datos actuales:", { decision, checklist });
+
+    if (!decision.trim()) {
+       toast.error('Debes registrar tu observación técnica');
+      return; 
+    }
     onSave(ws, decision, checklist);
   };
 
@@ -83,15 +112,21 @@ const WarrantyDetail = ({ caseData, evidencesCount, sale, onSave }: { caseData: 
           <div className="rounded-xl border bg-card shadow-card p-5">
             <h3 className="font-display font-semibold mb-3">Ficha del caso</h3>
             <dl className="grid grid-cols-2 gap-3 text-sm">
-              <div><dt className="text-xs text-muted-foreground">Cliente</dt><dd className="font-medium">{caseData.clientName}</dd></div>
-              <div><dt className="text-xs text-muted-foreground">Producto</dt><dd className="font-medium">{caseData.productName}</dd></div>
-              <div><dt className="text-xs text-muted-foreground">Falla reportada</dt><dd className="font-medium">{caseData.failureType}</dd></div>
-              <div><dt className="text-xs text-muted-foreground">Comprobante</dt><dd className="font-mono">{caseData.invoice}</dd></div>
-              <div><dt className="text-xs text-muted-foreground">Fecha compra</dt><dd>{sale ? formatDate(sale.purchaseDate) : '—'}</dd></div>
-              <div><dt className="text-xs text-muted-foreground">Fecha reclamo</dt><dd>{formatDate(caseData.date)}</dd></div>
-              <div><dt className="text-xs text-muted-foreground">Kilometraje</dt><dd className="font-mono">{caseData.mileage.toLocaleString()} km</dd></div>
-              <div><dt className="text-xs text-muted-foreground">Evidencias</dt><dd className="font-medium">{evidencesCount} archivos</dd></div>
-              <div className="col-span-2"><dt className="text-xs text-muted-foreground">Descripción</dt><dd className="text-sm">{caseData.description}</dd></div>
+              <div><dt className="text-xs text-muted-foreground">Cliente</dt><dd className="font-medium">{caseData?.client_name || '—'}</dd></div>
+              <div><dt className="text-xs text-muted-foreground">Producto</dt><dd className="font-medium">{caseData?.product_name || '—'}</dd></div>
+              <div><dt className="text-xs text-muted-foreground">Falla reportada</dt><dd className="font-medium">{caseData?.failure_type || '—'}</dd></div>
+              
+              <div><dt className="text-xs text-muted-foreground">Fecha compra</dt><dd className="font-medium">{sale && sale.purchase_date ? formatDate(sale.purchase_date) : (sale ? "Fecha no registrada" : "Venta no encontrada")}</dd></div>
+
+              <div><dt className="text-xs text-muted-foreground">Fecha reclamo</dt><dd>{caseData?.date ? formatDate(caseData.date) : '—'}</dd></div>
+
+              <div>
+                <dt className="text-xs text-muted-foreground">Kilometraje</dt>
+                <dd className="font-mono">{caseData?.mileage != null ? caseData.mileage.toLocaleString() : '0'} km</dd>
+              </div>
+
+              <div><dt className="text-xs text-muted-foreground">Evidencias</dt><dd className="font-medium">{evidencesCount ?? 0} archivos</dd></div>
+              <div className="col-span-2"><dt className="text-xs text-muted-foreground">Descripción</dt><dd className="text-sm">{caseData?.description || 'Sin descripción'}</dd></div>
             </dl>
           </div>
           <div className="rounded-xl border bg-card shadow-card p-5">
@@ -99,8 +134,14 @@ const WarrantyDetail = ({ caseData, evidencesCount, sale, onSave }: { caseData: 
             <div className="space-y-2">
               {checklist.map((item, i) => (
                 <label key={i} className="flex items-center gap-3 p-2 rounded hover:bg-muted/40 cursor-pointer">
-                  <Checkbox checked={item.checked} onCheckedChange={(v) => setChecklist(cl => cl.map((x, j) => j === i ? { ...x, checked: !!v } : x))} />
-                  <span className="text-sm">{item.label}</span>
+                <Checkbox 
+                  checked={item.checked} 
+                  onCheckedChange={(v) => {
+                    const nextChecklist = checklist.map((x, j) => j === i ? { ...x, checked: !!v } : x);
+                    setChecklist(nextChecklist); // <-- ESTO ES VITAL: Actualizar el estado local
+                  }} 
+                />  
+                <span className="text-sm">{item.label}</span>
                 </label>
               ))}
             </div>

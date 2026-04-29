@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Plus, Search, Eye, AlertTriangle } from 'lucide-react';
 import { useData } from '@/app/data/useData';
 import { Case, Priority } from '@/app/types';
@@ -17,7 +17,7 @@ import { formatDate } from '@/app/format/format';
 import { useNavigate } from 'react-router-dom';
 
 const IncidentsPage = () => {
-  const { cases, sales, users, failureTypes, addCase } = useData();
+  const { cases, sales, users, failureTypes, addCase, fetchCases, fetchData } = useData(); 
   const session = useAuth(s => s.session)!;
   const nav = useNavigate();
   const clients = users.filter(u => u.type === 'cliente');
@@ -27,30 +27,45 @@ const IncidentsPage = () => {
   const [priorityF, setPriorityF] = useState('all');
   const [open, setOpen] = useState(false);
   const [createdCase, setCreatedCase] = useState<Case | null>(null);
+  const [loading, setLoading] = useState(false); 
 
   const [form, setForm] = useState({
     clientId: '', saleId: '', failureType: '', description: '', observations: '',
-    invoice: '', mileage: 0, priority: 'media' as Priority,
+    invoice: '', productName: '', mileage: 0, priority: 'media' as Priority,
   });
   const [errors, setErrors] = useState<Record<string,string>>({});
 
+
+  useEffect(() => {
+    fetchCases();
+  }, [fetchCases]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  
   // Cliente solo ve sus casos
   const visible = useMemo(() => {
     let list = cases;
     if (session.role === 'cliente') {
       const me = users.find(u => u.email === session.email);
-      list = list.filter(c => c.clientId === me?.id);
+      list = list.filter(c => c.client_id === me?.id);
     }
     return list.filter(c => {
       const m = q.toLowerCase().trim();
-      if (m && !`${c.code} ${c.clientName} ${c.productName} ${c.failureType}`.toLowerCase().includes(m)) return false;
+      if (m && !`${c.code} ${c.client_name} ${c.product_name} ${c.failure_type}`.toLowerCase().includes(m)) return false;
       if (statusF !== 'all' && c.status !== statusF) return false;
       if (priorityF !== 'all' && c.priority !== priorityF) return false;
       return true;
     });
   }, [cases, q, statusF, priorityF, session, users]);
 
-  const clientSales = useMemo(() => sales.filter(s => s.clientId === form.clientId), [sales, form.clientId]);
+
+    const clientSales = useMemo(() => {
+      return sales.filter(s => s.client_id === form.clientId);
+    }, [sales, form.clientId]);
+
 
   const validate = () => {
     const e: Record<string,string> = {};
@@ -62,22 +77,45 @@ const IncidentsPage = () => {
     setErrors(e); return Object.keys(e).length === 0;
   };
 
-  const submit = () => {
-    if (!validate()) return;
+  const submit = async () => {
+  if (!validate()) return;
+  setLoading(true);
+    
     const client = clients.find(c => c.id === form.clientId)!;
     const sale = sales.find(s => s.id === form.saleId)!;
-    const c = addCase({
-      date: new Date().toISOString().slice(0,10),
-      clientId: form.clientId, clientName: client.name,
-      saleId: form.saleId, productName: sale.productName,
-      failureType: form.failureType, description: form.description,
-      observations: form.observations, invoice: sale.invoice,
-      mileage: form.mileage, priority: form.priority,
-      createdBy: session.name,
-    } as any, { name: session.name, role: session.role });
-    setOpen(false);
-    setCreatedCase(c);
-    setForm({ clientId:'', saleId:'', failureType:'', description:'', observations:'', invoice:'', mileage:0, priority:'media' });
+
+    if (!client || !sale) {
+      toast.error("Error: Información de cliente o venta incompleta");
+      setLoading(false);
+      return;
+    }
+    
+    try {
+      const newCase = await addCase({
+      client_id: form.clientId, 
+      client_name: clients.find(c => c.id === form.clientId)?.name || '',
+      sale_id: form.saleId, 
+      product_name: sale.product_name,
+      failure_type: form.failureType,
+      description: form.description,
+      observations: form.observations,
+      invoice: sale.invoice,
+      mileage: form.mileage,
+      priority: form.priority
+    }, { name: session.name, role: session.role });
+
+      if (newCase) {
+        console.log("Caso guardado exitosamente:", newCase);
+        setOpen(false);
+        setCreatedCase(newCase);
+      } else {
+        console.error("addCase devolvió null");
+      }
+    } catch (e) {
+      toast.error("Error de conexión al guardar");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const openCase = (id: string) => nav(`/app/trazabilidad/${id}`);
@@ -91,7 +129,8 @@ const IncidentsPage = () => {
         ) : null}
       />
 
-      <div className="rounded-xl border bg-card shadow-card">
+      <div className="rounded-xl border bg-card shadow-card overflow-hidden">
+
         <div className="p-4 border-b flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -112,8 +151,9 @@ const IncidentsPage = () => {
             </SelectContent>
           </Select>
         </div>
+        <div className="overflow-auto max-h-[500px]">
         <Table>
-          <TableHeader>
+          <TableHeader className="sticky top-0 bg-background z-10">
             <TableRow>
               <TableHead>Código</TableHead>
               <TableHead>Cliente / Producto</TableHead>
@@ -126,23 +166,38 @@ const IncidentsPage = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {visible.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-12">No hay incidencias con los filtros aplicados</TableCell></TableRow>}
-            {visible.map(c => (
+            {visible.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center text-muted-foreground py-12">
+                  No hay incidencias con los filtros aplicados
+                </TableCell>
+              </TableRow>
+            )}
+            {visible.map((c: any) => {
+              console.log("Objeto del caso analizado:", c);
+              return (
               <TableRow key={c.id} className="hover:bg-muted/40 cursor-pointer" onClick={() => openCase(c.id)}>
                 <TableCell><span className="font-mono text-xs font-semibold text-primary">{c.code}</span></TableCell>
-                <TableCell><p className="font-medium text-sm">{c.clientName}</p><p className="text-xs text-muted-foreground">{c.productName}</p></TableCell>
-                <TableCell className="text-sm">{c.failureType}</TableCell>
+                <TableCell>
+                  {/* Usamos siempre el formato snake_case que viene de Supabase */}
+                  <p className="font-medium text-sm">{c.client_name || 'Sin nombre'}</p>
+                  <p className="text-xs text-muted-foreground">{c.product_name || 'Sin producto'}</p>
+                </TableCell>
+                <TableCell className="text-sm">{c.failure_type || 'Sin falla'}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">{formatDate(c.date)}</TableCell>
-                <TableCell className="text-sm font-mono">{c.mileage.toLocaleString()}</TableCell>
+                <TableCell className="text-sm font-mono">{c.mileage?.toLocaleString() || '0'}</TableCell>
                 <TableCell><PriorityBadge priority={c.priority} /></TableCell>
                 <TableCell><StatusBadge status={c.status} /></TableCell>
                 <TableCell className="text-right">
                   <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openCase(c.id); }}><Eye className="h-4 w-4" /></Button>
                 </TableCell>
               </TableRow>
-            ))}
+              )
+            })}
           </TableBody>
         </Table>
+        </div>
+        
         <div className="p-3 border-t text-xs text-muted-foreground">{visible.length} de {cases.length} casos</div>
       </div>
 
@@ -164,9 +219,30 @@ const IncidentsPage = () => {
             </div>
             <div className="space-y-1.5">
               <Label>Producto vendido *</Label>
-              <Select value={form.saleId} onValueChange={v => setForm({...form, saleId:v})} disabled={!form.clientId}>
-                <SelectTrigger className={errors.saleId?'border-destructive':''}><SelectValue placeholder={form.clientId ? 'Selecciona venta' : 'Selecciona cliente primero'} /></SelectTrigger>
-                <SelectContent>{clientSales.map(s => <SelectItem key={s.id} value={s.id}>{s.productName} · {s.invoice}</SelectItem>)}</SelectContent>
+              <Select 
+                value={form.saleId} 
+                onValueChange={(v) => {
+                  // Buscamos la venta seleccionada en la lista filtrada
+                  const selected = clientSales.find(s => s.id === v);
+                  setForm({
+                    ...form,
+                    saleId: v,
+                    productName: selected?.product_name || '', 
+                    invoice: selected?.invoice || ''           
+                  });
+                }}
+                disabled={!form.clientId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona producto" />
+                </SelectTrigger>
+                <SelectContent>
+                  {clientSales.map(s => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.product_name} - {s.invoice}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
               {errors.saleId && <p className="text-xs text-destructive">{errors.saleId}</p>}
             </div>
@@ -193,7 +269,7 @@ const IncidentsPage = () => {
             </div>
             <div className="space-y-1.5 md:col-span-1">
               <Label>Comprobante asociado</Label>
-              <Input value={form.saleId ? sales.find(s=>s.id===form.saleId)?.invoice || '' : ''} disabled />
+              <Input value={form.invoice} disabled placeholder="Se llenará automáticamente" />
             </div>
             <div className="space-y-1.5 md:col-span-2">
               <Label>Descripción del problema *</Label>
@@ -207,7 +283,13 @@ const IncidentsPage = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={submit} className="bg-gradient-primary text-primary-foreground">Generar caso</Button>
+            <Button 
+              onClick={submit} 
+              disabled={loading} 
+              className="bg-gradient-primary text-primary-foreground"
+            >
+              {loading ? 'Generando caso...' : 'Generar caso'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Plus, Search, Pencil, Eye } from 'lucide-react';
 import { useData } from '@/app/data/useData';
 import { Sale } from '@/app/types';
@@ -12,12 +12,30 @@ import { PageHeader } from '@/app/ui/page-header';
 import { toast } from 'sonner';
 import { formatDate } from '@/app/format/format';
 
-const blank: Omit<Sale, 'id'> = { productCode: '', productName: '', category: 'Frenos', brand: '', model: '', purchaseDate: new Date().toISOString().slice(0,10), invoice: '', clientId: '', clientName: '', vehicle: { plate: '', brand: '', model: '', year: new Date().getFullYear() }, amount: 0 };
+
+const blank: Omit<Sale, 'id'> = { 
+  product_code: '',
+  product_name: '', 
+  category: 'Frenos', 
+  brand: '', 
+  model: '', 
+  purchase_date: new Date().toISOString().slice(0, 10), 
+  invoice: '', 
+  client_id: '', 
+  client_name: '', 
+  vehicle: { 
+    plate: '', 
+    brand: '', 
+    model: '', 
+    year: new Date().getFullYear() 
+  }, 
+  amount: 0 
+};
 
 const categories = ['Frenos','Suspensión','Filtros','Eléctrico','Transmisión','Refrigeración','Motor','Carrocería'];
 
 const SalesPage = () => {
-  const { sales, addSale, updateSale, users } = useData();
+  const { sales, addSale, updateSale, users, fetchSales } = useData();
   const clients = users.filter(u => u.type === 'cliente');
   const [q, setQ] = useState('');
   const [cat, setCat] = useState('all');
@@ -26,10 +44,16 @@ const SalesPage = () => {
   const [editing, setEditing] = useState<Sale | null>(null);
   const [form, setForm] = useState<Omit<Sale,'id'>>(blank);
   const [errors, setErrors] = useState<Record<string,string>>({});
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetchSales();
+  }, [fetchSales]);
+
 
   const filtered = useMemo(() => sales.filter(s => {
     const m = q.toLowerCase().trim();
-    if (m && !`${s.productCode} ${s.productName} ${s.clientName} ${s.invoice} ${s.vehicle.plate}`.toLowerCase().includes(m)) return false;
+    if (m && !`${s.product_code} ${s.product_name} ${s.client_name} ${s.invoice} ${s.vehicle.plate}`.toLowerCase().includes(m)) return false;
     if (cat !== 'all' && s.category !== cat) return false;
     return true;
   }), [sales, q, cat]);
@@ -39,22 +63,41 @@ const SalesPage = () => {
 
   const validate = () => {
     const e: Record<string,string> = {};
-    if (!form.productCode.trim()) e.productCode = 'Código obligatorio';
-    if (!form.productName.trim()) e.productName = 'Nombre obligatorio';
-    if (!form.brand.trim()) e.brand = 'Marca obligatoria';
-    if (!form.invoice.trim()) e.invoice = 'Comprobante obligatorio';
-    if (!form.clientId) e.clientId = 'Selecciona cliente';
-    if (!form.vehicle.plate.trim()) e.plate = 'Placa obligatoria';
+    
+    if (!form.product_code?.trim()) e.productCode = 'Código obligatorio';
+    if (!form.product_name?.trim()) e.productName = 'Nombre obligatorio';
+    if (!form.brand?.trim()) e.brand = 'Marca obligatoria';
+    if (!form.invoice?.trim()) e.invoice = 'Comprobante obligatorio';
+    if (!form.client_id) e.clientId = 'Selecciona cliente';
+    if (!form.vehicle?.plate?.trim()) e.plate = 'Placa obligatoria';
     setErrors(e); return Object.keys(e).length === 0;
   };
 
-  const submit = () => {
+  const submit = async () => {
     if (!validate()) return;
-    const client = clients.find(c => c.id === form.clientId);
-    const final = { ...form, clientName: client?.name || form.clientName };
-    if (editing) { updateSale(editing.id, final); toast.success('Venta actualizada'); }
-    else { addSale(final); toast.success('Venta registrada'); }
-    setOpen(false);
+    setLoading(true);
+    try {
+      const client = clients.find(c => c.id === form.client_id);
+      const final = { ...form, client_name: client?.name || form.client_name };
+      
+      if (editing) {
+        console.log('entro a editar')
+        await updateSale(editing.id, final);
+        console.log('ejecuto la funcion')
+        toast.success('Venta actualizada');
+      } else {
+        console.log('Entro a crear')
+        console.log("--- OBJETO QUE ESTOY ENVIANDO A SUPABASE ---");
+        console.log(JSON.stringify(final, null, 2));
+        await addSale(final);
+        toast.success('Venta registrada');
+      }
+      setOpen(false);
+    } catch (e) {
+      toast.error('Error al guardar en la nube');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -76,6 +119,8 @@ const SalesPage = () => {
             </SelectContent>
           </Select>
         </div>
+
+        <div className="max-h-[60vh] overflow-auto rounded-xl border bg-card shadow-card">
         <Table>
           <TableHeader>
             <TableRow>
@@ -94,17 +139,17 @@ const SalesPage = () => {
             {filtered.map(s => (
               <TableRow key={s.id} className="hover:bg-muted/40">
                 <TableCell>
-                  <p className="font-medium text-sm">{s.productName}</p>
-                  <p className="font-mono text-xs text-muted-foreground">{s.productCode}</p>
+                  <p className="font-medium text-sm">{s.product_name}</p>
+                  <p className="font-mono text-xs text-muted-foreground">{s.product_code}</p>
                 </TableCell>
                 <TableCell className="text-sm">{s.category} · <span className="text-muted-foreground">{s.brand}</span></TableCell>
-                <TableCell className="text-sm">{s.clientName}</TableCell>
+                <TableCell className="text-sm">{s.client_name}</TableCell>
                 <TableCell className="text-sm">
                   <p className="font-mono font-semibold">{s.vehicle.plate}</p>
                   <p className="text-xs text-muted-foreground">{s.vehicle.brand} {s.vehicle.model} {s.vehicle.year}</p>
                 </TableCell>
                 <TableCell className="font-mono text-xs">{s.invoice}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{formatDate(s.purchaseDate)}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{formatDate(s.purchase_date)}</TableCell>
                 <TableCell className="text-right font-semibold">S/ {s.amount.toFixed(2)}</TableCell>
                 <TableCell className="text-right">
                   <Button variant="ghost" size="icon" onClick={() => setView(s)}><Eye className="h-4 w-4" /></Button>
@@ -114,6 +159,7 @@ const SalesPage = () => {
             ))}
           </TableBody>
         </Table>
+        </div>
         <div className="p-3 border-t text-xs text-muted-foreground">{filtered.length} de {sales.length} ventas</div>
       </div>
 
@@ -127,12 +173,12 @@ const SalesPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-2">
             <div className="space-y-1.5">
               <Label>Código de producto *</Label>
-              <Input value={form.productCode} onChange={e => setForm({...form, productCode:e.target.value})} className={errors.productCode ? 'border-destructive' : ''} />
+              <Input value={form.product_code || ''} onChange={e => setForm({...form, product_code:e.target.value})} className={errors.product_code ? 'border-destructive' : ''} />
               {errors.productCode && <p className="text-xs text-destructive">{errors.productCode}</p>}
             </div>
             <div className="space-y-1.5">
               <Label>Nombre del producto *</Label>
-              <Input value={form.productName} onChange={e => setForm({...form, productName:e.target.value})} className={errors.productName ? 'border-destructive' : ''} />
+              <Input value={form.product_name || ''} onChange={e => setForm({...form, product_name:e.target.value})} className={errors.product_name ? 'border-destructive' : ''} />
               {errors.productName && <p className="text-xs text-destructive">{errors.productName}</p>}
             </div>
             <div className="space-y-1.5">
@@ -142,7 +188,7 @@ const SalesPage = () => {
                 <SelectContent>{categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1.5">  
               <Label>Marca *</Label>
               <Input value={form.brand} onChange={e => setForm({...form, brand:e.target.value})} className={errors.brand ? 'border-destructive' : ''} />
               {errors.brand && <p className="text-xs text-destructive">{errors.brand}</p>}
@@ -157,7 +203,7 @@ const SalesPage = () => {
             </div>
             <div className="space-y-1.5">
               <Label>Fecha de compra</Label>
-              <Input type="date" value={form.purchaseDate} onChange={e => setForm({...form, purchaseDate:e.target.value})} />
+              <Input type="date" value={form.purchase_date || ''} onChange={e => setForm({...form, purchase_date:e.target.value})} />
             </div>
             <div className="space-y-1.5">
               <Label>Nº de comprobante *</Label>
@@ -166,7 +212,7 @@ const SalesPage = () => {
             </div>
             <div className="md:col-span-2 space-y-1.5">
               <Label>Cliente *</Label>
-              <Select value={form.clientId} onValueChange={v => setForm({...form, clientId: v})}>
+              <Select value={form.client_id} onValueChange={v => setForm({...form, client_id: v})}>
                 <SelectTrigger className={errors.clientId ? 'border-destructive' : ''}><SelectValue placeholder="Selecciona cliente" /></SelectTrigger>
                 <SelectContent>{clients.map(c => <SelectItem key={c.id} value={c.id}>{c.name} · {c.document}</SelectItem>)}</SelectContent>
               </Select>
@@ -183,7 +229,7 @@ const SalesPage = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={submit} className="bg-gradient-primary text-primary-foreground">{editing ? 'Guardar cambios' : 'Registrar venta'}</Button>
+            <Button onClick={submit} disabled={loading} className="bg-gradient-primary text-primary-foreground">{loading ? 'Guardando...' : (editing ? 'Guardar cambios' : 'Registrar venta')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -193,17 +239,17 @@ const SalesPage = () => {
         <DialogContent className="sm:max-w-lg">
           {view && <>
             <DialogHeader>
-              <DialogTitle className="font-display">{view.productName}</DialogTitle>
-              <DialogDescription className="font-mono">{view.productCode}</DialogDescription>
+              <DialogTitle className="font-display">{view.product_name}</DialogTitle>
+              <DialogDescription className="font-mono">{view.product_code}</DialogDescription>
             </DialogHeader>
             <dl className="grid grid-cols-2 gap-3 text-sm py-3">
               <div><dt className="text-xs text-muted-foreground">Categoría</dt><dd className="font-medium">{view.category}</dd></div>
               <div><dt className="text-xs text-muted-foreground">Marca</dt><dd className="font-medium">{view.brand}</dd></div>
-              <div><dt className="text-xs text-muted-foreground">Cliente</dt><dd className="font-medium">{view.clientName}</dd></div>
+              <div><dt className="text-xs text-muted-foreground">Cliente</dt><dd className="font-medium">{view.client_name}</dd></div>
               <div><dt className="text-xs text-muted-foreground">Comprobante</dt><dd className="font-mono">{view.invoice}</dd></div>
               <div><dt className="text-xs text-muted-foreground">Vehículo</dt><dd className="font-medium">{view.vehicle.brand} {view.vehicle.model} {view.vehicle.year}</dd></div>
               <div><dt className="text-xs text-muted-foreground">Placa</dt><dd className="font-mono font-semibold">{view.vehicle.plate}</dd></div>
-              <div><dt className="text-xs text-muted-foreground">Fecha</dt><dd>{formatDate(view.purchaseDate)}</dd></div>
+              <div><dt className="text-xs text-muted-foreground">Fecha</dt><dd>{formatDate(view.purchase_date)}</dd></div>
               <div><dt className="text-xs text-muted-foreground">Importe</dt><dd className="font-semibold">S/ {view.amount.toFixed(2)}</dd></div>
             </dl>
           </>}

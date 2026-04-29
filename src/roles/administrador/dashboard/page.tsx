@@ -5,7 +5,7 @@ import { useAuth, roleLabels } from '@/app/auth/useAuth';
 import { PageHeader } from '@/app/ui/page-header';
 import { StatusBadge } from '@/app/ui/status-badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/ui/select';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell, LineChart, Line, Legend } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell, LineChart, Line, Legend } from 'recharts';
 import { Link } from 'react-router-dom';
 import { CaseStatus } from '@/app/types';
 import { formatDate } from '@/app/format/format';
@@ -43,7 +43,9 @@ const DashboardPage = () => {
   const kpis = useMemo(() => {
     const open = filtered.filter(c => !['cerrado','resuelto','rechazado'].includes(c.status)).length;
     const closed = filtered.filter(c => ['cerrado','resuelto'].includes(c.status)).length;
-    const validated = filtered.filter(c => c.warrantyStatus === 'validado').length;
+    
+    const validated = filtered.filter(c => c.warrantyStatus === 'validado' || (c as any).warranty_status === 'validado').length;
+    
     return {
       total: filtered.length,
       open, closed, validated,
@@ -60,7 +62,7 @@ const DashboardPage = () => {
 
   const byFailure = useMemo(() => {
     const m: Record<string, number> = {};
-    filtered.forEach(c => m[c.failureType] = (m[c.failureType] || 0) + 1);
+    filtered.forEach(c => m[c.failure_type] = (m[c.failure_type] || 0) + 1);
     return Object.entries(m).map(([name, value]) => ({ name, value })).sort((a,b)=>b.value-a.value).slice(0,6);
   }, [filtered]);
 
@@ -111,15 +113,68 @@ const DashboardPage = () => {
             <span className="text-xs text-muted-foreground flex items-center gap-1"><TrendingUp className="h-3 w-3" />Tiempo promedio: {kpis.avgTime}</span>
           </div>
           <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={trend}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="mes" stroke="hsl(var(--muted-foreground))" fontSize={11} />
-              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} />
-              <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Line type="monotone" dataKey="abiertos" stroke="hsl(var(--primary))" strokeWidth={2.5} />
-              <Line type="monotone" dataKey="cerrados" stroke="hsl(var(--accent))" strokeWidth={2.5} />
-            </LineChart>
+            <AreaChart data={trend}>
+              <defs>
+                {/* Definición del gradiente para 'Abiertos' */}
+                <linearGradient id="colorAbiertos" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                </linearGradient>
+                {/* Definición del gradiente para 'Cerrados' */}
+                <linearGradient id="colorCerrados" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+              
+              <XAxis 
+                dataKey="mes" 
+                stroke="hsl(var(--muted-foreground))" 
+                fontSize={11} 
+                tickLine={false} 
+                axisLine={false} 
+                dy={10}
+              />
+              <YAxis 
+                stroke="hsl(var(--muted-foreground))" 
+                fontSize={11} 
+                tickLine={false} 
+                axisLine={false} 
+              />
+              
+              <Tooltip 
+                contentStyle={{ 
+                  background: 'hsl(var(--card))', 
+                  border: '1px solid hsl(var(--border))', 
+                  borderRadius: 12,
+                  boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' 
+                }} 
+              />
+              
+              <Legend iconType="circle" wrapperStyle={{ fontSize: 12, paddingTop: 20 }} />
+
+              {/* Área para Casos Abiertos */}
+              <Area 
+                type="monotone" 
+                dataKey="abiertos" 
+                stroke="hsl(var(--primary))" 
+                strokeWidth={3}
+                fillOpacity={1} 
+                fill="url(#colorAbiertos)" 
+              />
+              
+              {/* Área para Casos Cerrados */}
+              <Area 
+                type="monotone" 
+                dataKey="cerrados" 
+                stroke="hsl(var(--accent))" 
+                strokeWidth={3}
+                fillOpacity={1} 
+                fill="url(#colorCerrados)" 
+              />
+            </AreaChart>
           </ResponsiveContainer>
         </div>
         <div className="rounded-xl border bg-card shadow-card p-5">
@@ -158,8 +213,8 @@ const DashboardPage = () => {
                   <span className="font-mono text-xs font-semibold text-primary">{c.code}</span>
                   <StatusBadge status={c.status as CaseStatus} />
                 </div>
-                <p className="text-sm font-medium mt-1 truncate">{c.productName}</p>
-                <p className="text-xs text-muted-foreground">{c.clientName} · {formatDate(c.date)}</p>
+                <p className="text-sm font-medium mt-1 truncate">{c.product_name}</p>
+                <p className="text-xs text-muted-foreground">{c.client_name} · {formatDate(c.date)}</p>
               </Link>
             ))}
           </div>
