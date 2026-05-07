@@ -14,11 +14,12 @@ import { Avatar, AvatarFallback } from '@/app/ui/avatar';
 import { toast } from 'sonner';
 import { Switch } from '@/app/ui/switch';
 import { formatDate } from '@/app/format/format';
+import { cn } from '@/app/lib/utils';
 
 const blank: Omit<User, 'id' | 'createdAt'> = { name: '', email: '', document: '', phone: '', role: 'cliente', type: 'cliente', active: true };
 
 const UsersPage = () => {
-const { users, addUser, updateUser, toggleUserActive, fetchData } = useData();
+  const { users, addUser, updateUser, toggleUserActive, fetchData } = useData();
   const [q, setQ] = useState('');
   const [roleF, setRoleF] = useState<string>('all');
   const [typeF, setTypeF] = useState<string>('all');
@@ -59,10 +60,10 @@ const { users, addUser, updateUser, toggleUserActive, fetchData } = useData();
     try {
       if (editing) {
         await updateUser(editing.id, form);
-        toast.success('Usuario actualizado en la nube');
+        toast.success('Usuario actualizado');
       } else {
         await addUser(form);
-        toast.success('Usuario creado en la nube');
+        toast.success('Usuario creado');
       }
       setOpen(false);
     } catch (error) {
@@ -74,112 +75,141 @@ const { users, addUser, updateUser, toggleUserActive, fetchData } = useData();
 
   return (
     <>
-      <PageHeader kicker="Módulo 1" title="Usuarios y clientes" description="Gestiona usuarios internos y clientes externos del sistema."
-        actions={<Button onClick={openNew} className="bg-gradient-primary text-primary-foreground"><Plus className="h-4 w-4 mr-2" />Nuevo</Button>} />
+      <PageHeader 
+        kicker="Módulo 1" 
+        title="Usuarios y clientes" 
+        description="Gestiona usuarios internos y clientes externos."
+        actions={<Button onClick={openNew} className="bg-gradient-primary text-primary-foreground w-full sm:w-auto"><Plus className="h-4 w-4 mr-2" />Nuevo</Button>} 
+      />
 
-      <div className="rounded-xl border bg-card shadow-card">
-        <div className="p-4 border-b flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1 max-w-md">
+      <div className="rounded-xl border bg-card shadow-card overflow-hidden">
+        {/* FILTROS RESPONSIVOS */}
+        <div className="p-4 border-b flex flex-col lg:flex-row gap-3">
+          <div className="relative flex-1 w-full lg:max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar por nombre, correo o documento..." value={q} onChange={e => setQ(e.target.value)} className="pl-9" />
+            <Input placeholder="Buscar por nombre, correo..." value={q} onChange={e => setQ(e.target.value)} className="pl-9 w-full" />
           </div>
-          <Select value={typeF} onValueChange={setTypeF}>
-            <SelectTrigger className="w-44"><SelectValue placeholder="Tipo" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los tipos</SelectItem>
-              <SelectItem value="interno">Interno</SelectItem>
-              <SelectItem value="cliente">Cliente</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={roleF} onValueChange={setRoleF}>
-            <SelectTrigger className="w-52"><SelectValue placeholder="Rol" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los roles</SelectItem>
-              {Object.entries(roleLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+            <Select value={typeF} onValueChange={setTypeF}>
+              <SelectTrigger className="w-full sm:w-44"><SelectValue placeholder="Tipo" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los tipos</SelectItem>
+                <SelectItem value="interno">Interno</SelectItem>
+                <SelectItem value="cliente">Cliente</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={roleF} onValueChange={setRoleF}>
+              <SelectTrigger className="w-full sm:w-52"><SelectValue placeholder="Rol" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los roles</SelectItem>
+                {Object.entries(roleLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
-
-        <div className="max-h-[500px] overflow-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Persona</TableHead>
-              <TableHead>Documento</TableHead>
-              <TableHead>Contacto</TableHead>
-              <TableHead>Rol</TableHead>
-              <TableHead>Tipo</TableHead>
-              <TableHead>Registro</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-12">Sin resultados con los filtros aplicados</TableCell></TableRow>}
-            {filtered.map(u => (
-              <TableRow key={u.id} className="hover:bg-muted/40">
-                <TableCell>
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-9 w-9"><AvatarFallback className="bg-gradient-primary text-white text-xs">{u.name.split(' ').map(s => s[0]).slice(0,2).join('')}</AvatarFallback></Avatar>
-                    <div><p className="font-medium text-sm">{u.name}</p><p className="text-xs text-muted-foreground">{u.email}</p></div>
-                  </div>
-                </TableCell>
-                <TableCell className="font-mono text-xs">{u.document}</TableCell>
-                <TableCell className="text-sm">{u.phone}</TableCell>
-                <TableCell><span className="text-sm">{roleLabels[u.role]}</span></TableCell>
-                <TableCell><span className={`text-xs px-2 py-1 rounded-md ${u.type === 'interno' ? 'bg-primary/10 text-primary' : 'bg-accent/10 text-accent'}`}>{u.type === 'interno' ? 'Interno' : 'Cliente'}</span></TableCell>
-                <TableCell className="text-sm text-muted-foreground">{formatDate(u.createdAt)}</TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Switch checked={u.active} onCheckedChange={async () => { await toggleUserActive(u.id); toast.success('Estado actualizado'); }} />
-                    <span className={`text-xs ${u.active ? 'text-success' : 'text-muted-foreground'}`}>{u.active ? 'Activo' : 'Inactivo'}</span>
-                  </div>
-                </TableCell>
-                <TableCell className="text-right">
-                  <Button variant="ghost" size="icon" onClick={() => openEdit(u)}><Pencil className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="icon" onClick={() => { toggleUserActive(u.id); toast.success('Estado actualizado'); }}><Power className="h-4 w-4" /></Button>
-                </TableCell>
+        {/* TABLA CON SCROLL HORIZONTAL */}
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="min-w-[200px]">Persona</TableHead>
+                <TableHead className="hidden md:table-cell">Documento</TableHead>
+                <TableHead className="hidden sm:table-cell">Contacto</TableHead>
+                <TableHead>Rol</TableHead>
+                <TableHead className="hidden lg:table-cell">Tipo</TableHead>
+                <TableHead className="hidden xl:table-cell">Registro</TableHead>
+                <TableHead>Estado</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {filtered.length === 0 && (
+                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-12">Sin resultados</TableCell></TableRow>
+              )}
+              {filtered.map(u => (
+                <TableRow key={u.id} className="hover:bg-muted/40">
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-8 w-8 sm:h-9 sm:w-9 shrink-0">
+                        <AvatarFallback className="bg-gradient-primary text-white text-[10px] sm:text-xs">
+                          {u.name.split(' ').map(s => s[0]).slice(0,2).join('')}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <p className="font-medium text-xs sm:text-sm truncate max-w-[120px] sm:max-w-none">{u.name}</p>
+                        <p className="text-[10px] sm:text-xs text-muted-foreground truncate max-w-[120px] sm:max-w-none">{u.email}</p>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-mono text-[10px] sm:text-xs hidden md:table-cell">{u.document}</TableCell>
+                  <TableCell className="text-xs sm:text-sm hidden sm:table-cell">{u.phone}</TableCell>
+                  <TableCell>
+                    <span className="text-[10px] sm:text-sm">{roleLabels[u.role]}</span>
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell">
+                    <span className={cn(
+                      "text-[10px] px-2 py-1 rounded-md font-medium",
+                      u.type === 'interno' ? 'bg-primary/10 text-primary' : 'bg-accent/10 text-accent'
+                    )}>
+                      {u.type === 'interno' ? 'Interno' : 'Cliente'}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-[10px] sm:text-xs text-muted-foreground hidden xl:table-cell">{formatDate(u.createdAt)}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Switch className="scale-75 sm:scale-100" checked={u.active} onCheckedChange={async () => { await toggleUserActive(u.id); toast.success('Estado actualizado'); }} />
+                      <span className={cn("text-[10px] hidden sm:inline", u.active ? 'text-success' : 'text-muted-foreground')}>
+                        {u.active ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(u)}><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => { toggleUserActive(u.id); toast.success('Estado actualizado'); }}><Power className="h-3.5 w-3.5" /></Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
-        
-        <div className="p-3 border-t text-xs text-muted-foreground">{filtered.length} de {users.length} registros</div>
+        <div className="p-3 border-t text-[10px] sm:text-xs text-muted-foreground">{filtered.length} de {users.length} registros</div>
       </div>
 
+      {/* MODAL USUARIO RESPONSIVO */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="max-w-[95vw] sm:max-w-lg rounded-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="font-display">{editing ? 'Editar registro' : 'Nuevo usuario o cliente'}</DialogTitle>
-            <DialogDescription>Completa los datos. Los campos con * son obligatorios.</DialogDescription>
+            <DialogTitle className="font-display text-base sm:text-lg">{editing ? 'Editar registro' : 'Nuevo usuario o cliente'}</DialogTitle>
+            <DialogDescription className="text-xs">Los campos con * son obligatorios.</DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-2">
-            <div className="md:col-span-2 space-y-1.5">
-              <Label>Nombre completo *</Label>
-              <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className={errors.name ? 'border-destructive' : ''} />
-              {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-2">
+            <div className="sm:col-span-2 space-y-1.5">
+              <Label className="text-xs">Nombre completo *</Label>
+              <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className={cn("text-sm", errors.name && 'border-destructive')} />
+              {errors.name && <p className="text-[10px] text-destructive">{errors.name}</p>}
             </div>
             <div className="space-y-1.5">
-              <Label>Documento *</Label>
-              <Input value={form.document} onChange={e => setForm({ ...form, document: e.target.value })} className={errors.document ? 'border-destructive' : ''} />
-              {errors.document && <p className="text-xs text-destructive">{errors.document}</p>}
+              <Label className="text-xs">Documento *</Label>
+              <Input value={form.document} onChange={e => setForm({ ...form, document: e.target.value })} className={cn("text-sm", errors.document && 'border-destructive')} />
+              {errors.document && <p className="text-[10px] text-destructive">{errors.document}</p>}
             </div>
             <div className="space-y-1.5">
-              <Label>Teléfono *</Label>
-              <Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className={errors.phone ? 'border-destructive' : ''} />
-              {errors.phone && <p className="text-xs text-destructive">{errors.phone}</p>}
+              <Label className="text-xs">Teléfono *</Label>
+              <Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className={cn("text-sm", errors.phone && 'border-destructive')} />
+              {errors.phone && <p className="text-[10px] text-destructive">{errors.phone}</p>}
             </div>
-            <div className="md:col-span-2 space-y-1.5">
-              <Label>Correo *</Label>
-              <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className={errors.email ? 'border-destructive' : ''} />
-              {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
+            <div className="sm:col-span-2 space-y-1.5">
+              <Label className="text-xs">Correo *</Label>
+              <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className={cn("text-sm", errors.email && 'border-destructive')} />
+              {errors.email && <p className="text-[10px] text-destructive">{errors.email}</p>}
             </div>
             <div className="space-y-1.5">
-              <Label>Tipo</Label>
+              <Label className="text-xs">Tipo</Label>
               <Select value={form.type} onValueChange={(v: any) => setForm({ ...form, type: v, role: v === 'cliente' ? 'cliente' : form.role })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="interno">Interno</SelectItem>
                   <SelectItem value="cliente">Cliente</SelectItem>
@@ -187,19 +217,21 @@ const { users, addUser, updateUser, toggleUserActive, fetchData } = useData();
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Rol</Label>
+              <Label className="text-xs">Rol</Label>
               <Select value={form.role} onValueChange={(v: Role) => setForm({ ...form, role: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {Object.entries(roleLabels).filter(([k]) => form.type === 'cliente' ? k === 'cliente' : k !== 'cliente').map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                  {Object.entries(roleLabels).filter(([k]) => form.type === 'cliente' ? k === 'cliente' : k !== 'cliente').map(([k, v]) => (
+                    <SelectItem key={k} value={k}>{v}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={submit} disabled={loading} className="bg-gradient-primary text-primary-foreground">
-              {loading ? 'Procesando...' : (editing ? 'Guardar cambios' : 'Crear registro')}
+          <DialogFooter className="flex-col sm:flex-row gap-2 mt-2">
+            <Button variant="outline" onClick={() => setOpen(false)} className="w-full sm:w-auto">Cancelar</Button>
+            <Button onClick={submit} disabled={loading} className="bg-gradient-primary text-primary-foreground w-full sm:w-auto">
+              {loading ? 'Procesando...' : (editing ? 'Guardar' : 'Crear')}
             </Button>
           </DialogFooter>
         </DialogContent>

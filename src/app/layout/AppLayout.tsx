@@ -1,19 +1,22 @@
+import { useState } from 'react'; // AÑADIDO
 import { Outlet, useLocation, useNavigate, NavLink as RouterNavLink, Link } from 'react-router-dom';
-import { Activity, LogOut, Search, Bell, ChevronRight } from 'lucide-react';
+import { Activity, LogOut, Search, Bell, ChevronRight, Menu } from 'lucide-react'; // AÑADIDO Menu
 import { useAuth, roleLabels } from '@/app/auth/useAuth';
 import { navByRole } from '@/app/layout/navConfig';
 import { Button } from '@/app/ui/button';
 import { Avatar, AvatarFallback } from '@/app/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/app/ui/dropdown-menu';
+import { Sheet, SheetContent, SheetTrigger } from '@/app/ui/sheet'; // Asegúrate de tener este componente
 import { cn } from '@/app/lib/utils';
 import { toast } from 'sonner';
-import logo  from '@/public/logo.png';
 
 export const AppLayout = () => {
   const session = useAuth(s => s.session);
   const logout = useAuth(s => s.logout);
   const nav = useNavigate();
   const loc = useLocation();
+  const [open, setOpen] = useState(false); // Estado para el menú móvil
+
   if (!session) return null;
   const items = navByRole[session.role];
   const grouped = items.reduce<Record<string, typeof items>>((acc, it) => {
@@ -27,47 +30,52 @@ export const AppLayout = () => {
 
   const onLogout = () => { logout(); toast.success('Sesión cerrada'); nav('/login', { replace: true }); };
 
+  // Componente de navegación para reutilizar en Sidebar y en Móvil
+  const NavigationItems = () => (
+    <>
+      {Object.entries(grouped).map(([group, list]) => (
+        <div key={group}>
+          <p className="px-3 mb-1 text-[10px] uppercase tracking-widest font-semibold text-sidebar-foreground/40">{group}</p>
+          <div className="space-y-0.5">
+            {list.map(it => (
+              <RouterNavLink 
+                key={it.to} 
+                to={it.to}
+                onClick={() => setOpen(false)} // Cierra el menú al hacer click
+                className={({ isActive }) => cn(
+                  'group flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
+                  isActive
+                    ? 'bg-sidebar-accent text-white font-medium shadow-inner'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-white'
+                )}>
+                {({ isActive }) => (
+                  <>
+                    <it.icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-accent' : 'text-sidebar-foreground/60 group-hover:text-white')} />
+                    <span className="truncate">{it.label}</span>
+                    {isActive && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-accent" />}
+                  </>
+                )}
+              </RouterNavLink>
+            ))}
+          </div>
+        </div>
+      ))}
+    </>
+  );
+
   return (
     <div className="min-h-screen flex bg-background">
-      {/* Sidebar */}
+      {/* Sidebar - Desktop */}
       <aside className="hidden lg:flex w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
         <Link to="/app/dashboard" className="flex items-center gap-3 px-5 h-16 border-b border-sidebar-border shrink-0">
-          <img 
-            src="/logo.png" 
-            alt="Logo" 
-            className="h-9 w-9 object-contain" // 'object-contain' evita que se corte
-            onError={(e) => (e.currentTarget.style.display = 'none')} // Si falla, no muestra el icono roto
-          />
+          <img src="/logo.png" alt="Logo" className="h-9 w-9 object-contain" />
           <div className="leading-tight">
             <p className="font-display text-sm font-bold text-white">ZENDAJ</p>
             <p className="text-[10px] uppercase tracking-[0.2em] text-sidebar-foreground/60">Smart-Trace</p>
           </div>
         </Link>
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-5">
-          {Object.entries(grouped).map(([group, list]) => (
-            <div key={group}>
-              <p className="px-3 mb-1 text-[10px] uppercase tracking-widest font-semibold text-sidebar-foreground/40">{group}</p>
-              <div className="space-y-0.5">
-                {list.map(it => (
-                  <RouterNavLink key={it.to} to={it.to}
-                    className={({ isActive }) => cn(
-                      'group flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
-                      isActive
-                        ? 'bg-sidebar-accent text-white font-medium shadow-inner'
-                        : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-white'
-                    )}>
-                    {({ isActive }) => (
-                      <>
-                        <it.icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-accent' : 'text-sidebar-foreground/60 group-hover:text-white')} />
-                        <span className="truncate">{it.label}</span>
-                        {isActive && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-accent" />}
-                      </>
-                    )}
-                  </RouterNavLink>
-                ))}
-              </div>
-            </div>
-          ))}
+          <NavigationItems />
         </nav>
         <div className="p-3 border-t border-sidebar-border">
           <div className="rounded-lg bg-sidebar-accent/40 p-3">
@@ -78,21 +86,43 @@ export const AppLayout = () => {
         </div>
       </aside>
 
-      {/* Main */}
+      {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 flex items-center gap-4 px-4 lg:px-8 border-b bg-card/80 backdrop-blur sticky top-0 z-30">
+          {/* Menu Móvil Button */}
           <div className="lg:hidden flex items-center gap-2">
-            <img src="/logo.png" alt="Logo" className="h-8 w-8 object-contain" />
-            <span className="font-display font-bold">ZENDAJ</span>
+            <Sheet open={open} onOpenChange={setOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="shrink-0">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-72 bg-sidebar p-0 border-r-sidebar-border">
+                <div className="flex flex-col h-full">
+                  <div className="flex items-center gap-3 px-5 h-16 border-b border-sidebar-border shrink-0">
+                    <img src="/logo.png" alt="Logo" className="h-8 w-8 object-contain" />
+                    <span className="font-display font-bold text-white">ZENDAJ</span>
+                  </div>
+                  <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-5 bg-sidebar">
+                    <NavigationItems />
+                  </nav>
+                </div>
+              </SheetContent>
+            </Sheet>
+            <img src="/logo.png" alt="Logo" className="h-7 w-7 object-contain ml-1" />
+            <span className="font-display font-bold text-sm">ZENDAJ</span>
           </div>
+
           <div className="hidden md:flex items-center text-sm text-muted-foreground">
             <Link to="/app/dashboard" className="hover:text-foreground">Inicio</Link>
             {current && <><ChevronRight className="h-4 w-4 mx-1" /><span className="text-foreground font-medium">{current.label}</span></>}
           </div>
+
           <div className="ml-auto flex items-center gap-3">
+            {/* ... Resto de tu código de Search, Bell y Dropdown (sin cambios) ... */}
             <div className="hidden md:flex relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <input placeholder="Buscar caso, cliente, producto..." className="h-9 w-72 rounded-lg border bg-background pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+              <input placeholder="Buscar..." className="h-9 w-72 rounded-lg border bg-background pl-9 pr-3 text-sm focus:outline-none" />
             </div>
             <Button variant="ghost" size="icon" className="relative">
               <Bell className="h-4 w-4" />

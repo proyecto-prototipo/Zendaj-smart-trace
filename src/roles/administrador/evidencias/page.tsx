@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, useEffect } from 'react';
-import { UploadCloud, FileImage, FileText, Trash2, Eye, MessageSquare, Download } from 'lucide-react';
+import { UploadCloud, FileImage, FileText, Trash2, Eye, MessageSquare, Download, ChevronLeft, ChevronRight } from 'lucide-react'; // AÑADIDO Chevron para flechas más intuitivas
 import { useData } from '@/app/data/useData';
 import { Evidence } from '@/app/types';
 import { Button } from '@/app/ui/button';
@@ -41,8 +41,6 @@ const EvidencesPage = () => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [activeIndices, setActiveIndices] = useState<Record<string, number>>({});
 
-
-
   useEffect(() => {
     fetchData();
   }, [fetchData]);
@@ -79,7 +77,6 @@ const EvidencesPage = () => {
       zip.file(file.name, blob);
     }
 
-    // Generamos el zip y lo descargamos
     const content = await zip.generateAsync({ type: "blob" });
     saveAs(content, `${e.name.replace(/\s+/g, '_')}.zip`);
     toast.dismiss();
@@ -95,21 +92,19 @@ const EvidencesPage = () => {
     });
   }, [evidences, caseFilter, typeFilter, q]);
 
+  const onFiles = (files: FileList | null) => {
+    if (!files) return;
+    const newFiles = Array.from(files);
+    if (newFiles.length > 5) {
+      toast.error("Solo puedes seleccionar un máximo de 5 archivos por carga.");
+      return;
+    }
+    setPending(newFiles);
+  };
 
-    const onFiles = (files: FileList | null) => {
-      if (!files) return;
-      const newFiles = Array.from(files);
-      if (newFiles.length > 5) {
-        toast.error("Solo puedes seleccionar un máximo de 5 archivos por carga.");
-        return;
-      }
-      setPending(newFiles);
-    };
-
-    useEffect(() => {
-      setCarruselIndex(0);
-    }, [view]);
-
+  useEffect(() => {
+    setCarruselIndex(0);
+  }, [view]);
 
   const submit = async () => {
     if (!selCase) { 
@@ -122,7 +117,6 @@ const EvidencesPage = () => {
 
     try {
       const uploadedFiles = [];
-
       for (const f of pending) {
         const fileName = `${Date.now()}_${f.name}`;
         await supabase.storage.from('evidencias').upload(fileName, f);
@@ -130,82 +124,81 @@ const EvidencesPage = () => {
         uploadedFiles.push({ name: f.name, url: publicUrl });
       }
 
-        await addEvidence({ 
-          caseId: selCase, 
-          name: `Lote de ${pending.length} archivos`,
-          type: selType, 
-          size: pending.reduce((acc, f) => acc + f.size, 0), 
-          uploadedBy: session.name,
-          uploaded_at: new Date().toISOString(),
-          comment: commentCarga,
-          files: uploadedFiles
-        });
-        toast.success('Guardado correctamente');
-        setPending([]); setOpen(false);
-      } catch (err: any) { toast.error('Error: ' + err.message); } finally { setLoading(false); }
-    };
+      await addEvidence({ 
+        caseId: selCase, 
+        name: `Lote de ${pending.length} archivos`,
+        type: selType, 
+        size: pending.reduce((acc, f) => acc + f.size, 0), 
+        uploadedBy: session.name,
+        uploaded_at: new Date().toISOString(),
+        comment: commentCarga,
+        files: uploadedFiles
+      });
+      toast.success('Guardado correctamente');
+      setPending([]); setOpen(false);
+    } catch (err: any) { toast.error('Error: ' + err.message); } finally { setLoading(false); }
+  };
 
   return (
     <>
       <PageHeader kicker="Módulo 4" title="Gestión de evidencias"
         description="Adjunta fotos, comprobantes y documentos. Toda evidencia debe pertenecer a un caso."
-        actions={<Button onClick={() => setOpen(true)} className="bg-gradient-primary text-primary-foreground"><UploadCloud className="h-4 w-4 mr-2" />Cargar evidencia</Button>}
+        actions={<Button onClick={() => setOpen(true)} className="bg-gradient-primary text-primary-foreground w-full sm:w-auto"><UploadCloud className="h-4 w-4 mr-2" />Cargar evidencia</Button>}
       />
 
-      <div className="rounded-xl border bg-card shadow-card mb-6 p-4 flex flex-col sm:flex-row gap-3">
-        <Input placeholder="Buscar archivo..." value={q} onChange={e => setQ(e.target.value)} className="max-w-sm" />
-        <Select value={caseFilter} onValueChange={setCaseFilter}>
-          <SelectTrigger className="w-72"><SelectValue placeholder="Caso" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los casos</SelectItem>
-            {(cases ?? []).map(c => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.code} · {c.client_name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-44"><SelectValue placeholder="Tipo" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los tipos</SelectItem>
-            <SelectItem value="foto">Foto</SelectItem><SelectItem value="comprobante">Comprobante</SelectItem><SelectItem value="documento">Documento</SelectItem><SelectItem value="video">Video</SelectItem>
-          </SelectContent>
-        </Select>
+      {/* FILTROS RESPONSIVOS */}
+      <div className="rounded-xl border bg-card shadow-card mb-6 p-4 flex flex-col md:flex-row gap-3">
+        <Input placeholder="Buscar archivo..." value={q} onChange={e => setQ(e.target.value)} className="w-full md:max-w-sm" />
+        <div className="flex flex-col sm:flex-row gap-3 w-full">
+          <Select value={caseFilter} onValueChange={setCaseFilter}>
+            <SelectTrigger className="w-full md:w-72"><SelectValue placeholder="Caso" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los casos</SelectItem>
+              {(cases ?? []).map(c => (
+                <SelectItem key={c.id} value={c.id}>{c.code} · {c.client_name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-full md:w-44"><SelectValue placeholder="Tipo" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los tipos</SelectItem>
+              <SelectItem value="foto">Foto</SelectItem>
+              <SelectItem value="comprobante">Comprobante</SelectItem>
+              <SelectItem value="documento">Documento</SelectItem>
+              <SelectItem value="video">Video</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {filtered.length === 0 && <div className="col-span-full text-center text-muted-foreground py-12 border rounded-xl bg-card">Sin evidencias para los filtros aplicados</div>}
         {filtered.map((e: Evidence) => { 
-          console.log("Evidencia:", e.name, "ID Caso:", e.caseId, "Casos disponibles:", cases);
           const Icon = typeIcon[e.type];
           return (
-
             <div key={e.id} className="group rounded-xl border bg-card shadow-card overflow-hidden hover:shadow-elegant transition-all">
               <div className="aspect-video bg-gradient-to-br from-muted to-secondary flex items-center justify-center relative overflow-hidden">
-                
-              {e.files && e.files.length > 0 ? (
-                e.type === 'video' ? (
-                  <video src={e.files[0].url} className="h-full w-full object-cover" muted />
-                ) : (e.files[0].name.toLowerCase().endsWith('.pdf') || e.files[0].name.toLowerCase().endsWith('.doc') || e.files[0].name.toLowerCase().endsWith('.docx')) ? (
-                  <div className="h-full w-full flex flex-col items-center justify-center bg-muted/50">
-                    <FileText className="h-12 w-12 text-primary" />
-                    <span className="text-[10px] font-bold mt-2 uppercase">{e.files[0].name.split('.').pop()}</span>
-                  </div>
+                {e.files && e.files.length > 0 ? (
+                  e.type === 'video' ? (
+                    <video src={e.files[0].url} className="h-full w-full object-cover" muted />
+                  ) : (e.files[0].name.toLowerCase().endsWith('.pdf') || e.files[0].name.toLowerCase().endsWith('.doc') || e.files[0].name.toLowerCase().endsWith('.docx')) ? (
+                    <div className="h-full w-full flex flex-col items-center justify-center bg-muted/50">
+                      <FileText className="h-12 w-12 text-primary" />
+                      <span className="text-[10px] font-bold mt-2 uppercase">{e.files[0].name.split('.').pop()}</span>
+                    </div>
+                  ) : (
+                    <img src={e.files[0].url} alt={e.files[0].name} className="h-full w-full object-cover" />
+                  )
+                ) : e.url && e.type === 'foto' ? (
+                  <img src={e.url} alt={e.name} className="h-full w-full object-cover" />
+                ) : e.url && e.type === 'video' ? (
+                  <video src={e.url} className="h-full w-full object-cover" muted />
                 ) : (
-                  <img src={e.files[0].url} alt={e.files[0].name} className="h-full w-full object-cover" />
-                )
-              ) : e.url && e.type === 'foto' ? (
-                <img src={e.url} alt={e.name} className="h-full w-full object-cover" />
-              ) : e.url && e.type === 'video' ? (
-                <video src={e.url} className="h-full w-full object-cover" muted />
-              ) : (
-                <div className="flex flex-col items-center gap-2">
-                  <Icon className="h-12 w-12 text-muted-foreground/60" />
-                </div>
-              )}
-
-                {/* La etiqueta de color SIEMPRE se muestra encima */}
+                  <div className="flex flex-col items-center gap-2">
+                    <Icon className="h-12 w-12 text-muted-foreground/60" />
+                  </div>
+                )}
                 <span className={cn('absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded font-semibold uppercase tracking-wider z-10', typeColor[e.type])}>
                   {e.type}
                 </span>
@@ -215,36 +208,25 @@ const EvidencesPage = () => {
                 <p className="font-medium text-sm truncate" title={e.name}>{e.name}</p>
                 {(() => {
                   const caso = (cases ?? []).find(c => c.id === e.case_id);
-                  console.log(evidences)
                   return caso ? (
-                    <p className="text-xs font-semibold text-primary mt-1 truncate bg-primary/10 px-2 py-1 rounded w-full">
+                    <p className="text-[11px] font-semibold text-primary mt-1 truncate bg-primary/10 px-2 py-1 rounded w-full">
                       {caso.code } · {caso.client_name}
                     </p>
                   ) : (
                     <p className="text-xs text-muted-foreground mt-1">Sin caso asociado</p>
                   );
                 })()}
-                <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
+                <div className="flex items-center justify-between mt-2 text-[10px] text-muted-foreground">
                   <span>{formatBytes(e.size)}</span>
                   <span>{formatDate(e.uploaded_at)}</span>
                 </div>
 
                 {e.comment && <p className="mt-2 text-xs italic text-muted-foreground border-l-2 border-primary/40 pl-2 line-clamp-2">"{e.comment}"</p>}
                 <div className="flex gap-1 mt-3">
-                  <Button size="sm" variant="outline" className="flex-1" onClick={() => setView(e)}><Eye className="h-3 w-3 mr-1" />Ver</Button>
+                  <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={() => setView(e)}><Eye className="h-3 w-3 mr-1" />Ver</Button>
                   <Button size="sm" variant="outline" onClick={() => setCommentToEdit({ id: e.id, text: e.comment || '' })}><MessageSquare className="h-3 w-3" /></Button>
-                  <Button size="sm" variant="outline" onClick={() => downloadAll(e)}>
-                    <Download className="h-3 w-3" />
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    className="text-destructive" 
-                    onClick={() => {
-                      (removeEvidence as any)(e.id, e.files || []); 
-                      toast.success('Evidencia eliminada correctamente');
-                    }}
-                  >
+                  <Button size="sm" variant="outline" onClick={() => downloadAll(e)}><Download className="h-3 w-3" /></Button>
+                  <Button size="sm" variant="outline" className="text-destructive" onClick={() => { (removeEvidence as any)(e.id, e.files || []); toast.success('Evidencia eliminada'); }}>
                     <Trash2 className="h-3 w-3" />
                   </Button>
                 </div>
@@ -254,91 +236,77 @@ const EvidencesPage = () => {
         })}
       </div>
 
-      {/* Upload modal */}
+      {/* MODAL CARGA RESPONSIVO */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="max-w-[95vw] sm:max-w-lg rounded-xl">
           <DialogHeader>
-            <DialogTitle className="font-display">Cargar evidencia</DialogTitle>
-            <DialogDescription>Toda evidencia debe pertenecer a un caso registrado.</DialogDescription>
+            <DialogTitle className="font-display text-lg">Cargar evidencia</DialogTitle>
+            <DialogDescription className="text-xs">Toda evidencia debe pertenecer a un caso registrado.</DialogDescription>
           </DialogHeader>
-          
-          <div className="space-y-1.5">
-            <Label>Comentario inicial</Label>
-            <Textarea 
-              value={commentCarga}
-              onChange={(e) => setCommentCarga(e.target.value)} 
-              placeholder="Escribe un comentario inicial..." 
-            />
-          </div>
-
-          <div className="space-y-4 py-2">
+          <div className="space-y-3 py-2 max-h-[70vh] overflow-y-auto px-1">
             <div className="space-y-1.5">
-              <Label>Caso asociado *</Label>
-              <Select value={selCase} onValueChange={setSelCase}>
-                <SelectTrigger><SelectValue placeholder="Selecciona caso" /></SelectTrigger>
-                <SelectContent>{cases.map(c => <SelectItem key={c.id} value={c.id}>{c.code} · {c.client_name}</SelectItem>)}</SelectContent>
-              </Select>
+              <Label className="text-xs">Comentario inicial</Label>
+              <Textarea value={commentCarga} onChange={(e) => setCommentCarga(e.target.value)} placeholder="Escribe un comentario..." className="text-sm" />
             </div>
-
-            <div className="space-y-1.5">
-              <Label>Tipo de evidencia</Label>
-              <Select value={selType} onValueChange={(v:any) => setSelType(v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="foto">Foto</SelectItem><SelectItem value="comprobante">Comprobante</SelectItem><SelectItem value="documento">Documento</SelectItem><SelectItem value="video">Video</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Caso asociado *</Label>
+                <Select value={selCase} onValueChange={setSelCase}>
+                  <SelectTrigger className="text-sm"><SelectValue placeholder="Selecciona caso" /></SelectTrigger>
+                  <SelectContent>{cases.map(c => <SelectItem key={c.id} value={c.id}>{c.code} · {c.client_name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Tipo de evidencia</Label>
+                <Select value={selType} onValueChange={(v:any) => setSelType(v)}>
+                  <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="foto">Foto</SelectItem><SelectItem value="comprobante">Comprobante</SelectItem><SelectItem value="documento">Documento</SelectItem><SelectItem value="video">Video</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
                  onDragLeave={() => setDrag(false)}
                  onDrop={(e) => { e.preventDefault(); setDrag(false); onFiles(e.dataTransfer.files); }}
                  onClick={() => inputRef.current?.click()}
-                 className={cn('rounded-xl border-2 border-dashed p-8 text-center cursor-pointer transition', drag ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-muted/40')}>
-              <UploadCloud className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
-              <p className="text-sm font-medium">Arrastra archivos aquí o <span className="text-primary">selecciónalos</span></p>
-              <p className="text-xs text-muted-foreground mt-1">Imágenes, PDFs, documentos</p>
-              <p className="text-xs text-muted-foreground mt-1">
-              Máximo 5 archivos por tipo.
-            </p>
+                 className={cn('rounded-xl border-2 border-dashed p-6 text-center cursor-pointer transition', drag ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-muted/40')}>
+              <UploadCloud className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+              <p className="text-sm font-medium">Seleccionar archivos</p>
+              <p className="text-[10px] text-muted-foreground mt-1">Máx. 5 archivos.</p>
               <input ref={inputRef} type="file" multiple className="hidden" onChange={e => onFiles(e.target.files)} />
             </div>
             {pending.length > 0 && (
               <div className="space-y-1">
-                <p className="text-xs font-medium text-muted-foreground">{pending.length} archivo(s) listo(s):</p>
                 {pending.map((f, i) => (
-                  <div key={i} className="flex items-center justify-between text-xs bg-muted/40 rounded p-2">
-                    <span className="truncate">{f.name}</span>
-                    <span className="text-muted-foreground">{formatBytes(f.size)}</span>
+                  <div key={i} className="flex items-center justify-between text-[10px] bg-muted/40 rounded p-2">
+                    <span className="truncate flex-1 mr-2">{f.name}</span>
+                    <span className="text-muted-foreground shrink-0">{formatBytes(f.size)}</span>
                   </div>
                 ))}
               </div>
             )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button 
-              onClick={submit} 
-              disabled={loading} 
-              className="bg-gradient-primary text-primary-foreground"
-            >
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setOpen(false)} className="w-full sm:w-auto">Cancelar</Button>
+            <Button onClick={submit} disabled={loading} className="bg-gradient-primary text-primary-foreground w-full sm:w-auto">
               {loading ? 'Subiendo...' : 'Cargar'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-
-      {/* View */}
+      {/* VIEW MODAL RESPONSIVO */}
       <Dialog open={!!view} onOpenChange={() => setView(null)}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="max-w-[95vw] sm:max-w-2xl rounded-xl p-4 sm:p-6">
           {view && <>
             <DialogHeader>
-              <DialogTitle className="font-display">{view.name}</DialogTitle>
+              <DialogTitle className="font-display text-base sm:text-lg truncate">{view.name}</DialogTitle>
               <DialogDescription>
                 {(() => {
                   const caso = (cases ?? []).find(c => c.id === view.case_id);
                   return caso ? (
-                    <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary ring-1 ring-inset ring-primary/20">
+                    <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-1 text-[10px] font-medium text-primary ring-1 ring-inset ring-primary/20">
                       {caso.code} · {caso.client_name}
                     </span>
                   ) : "Sin caso";
@@ -346,76 +314,75 @@ const EvidencesPage = () => {
               </DialogDescription>
             </DialogHeader>
 
-            <div className="relative aspect-video rounded-lg bg-muted flex items-center justify-center overflow-hidden">
+            <div className="relative aspect-video rounded-lg bg-muted flex items-center justify-center overflow-hidden my-2">
               {view.files && view.files.length > 0 ? (
-                // Lógica de Carrusel
                 <>
-                  {/* Aquí usamos el índice interno del componente */}
                   {(() => {
                     const current = view.files[activeIndices[view.id] || 0];
                     const isDoc = current.name.toLowerCase().endsWith('.pdf');
                     return isDoc ? (
                       <iframe src={current.url} className="w-full h-full" />
                     ) : view.type === 'video' ? (
-                      <video src={current.url} controls className="max-h-full" />
+                      <video src={current.url} controls className="max-h-full w-full" />
                     ) : (
-                      <img src={current.url} className="max-h-full object-contain" />
+                      <img src={current.url} className="max-h-full w-full object-contain" />
                     );
                   })()}
-                  
-                  {/* Flechas */}
                   {view.files.length > 1 && (
-                    <>
-                      <Button variant="ghost" className="absolute left-2 top-1/2" onClick={() => setActiveIndices(prev => ({...prev, [view.id]: Math.max(0, (prev[view.id] || 0) - 1)}))}>&lt;</Button>
-                      <Button variant="ghost" className="absolute right-2 top-1/2" onClick={() => setActiveIndices(prev => ({...prev, [view.id]: Math.min(view.files!.length - 1, (prev[view.id] || 0) + 1)}))}>&gt;</Button>
-                    </>
+                    <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex justify-between px-2 pointer-events-none">
+                      <Button variant="secondary" size="icon" className="h-8 w-8 rounded-full shadow-md pointer-events-auto" onClick={() => setActiveIndices(prev => ({...prev, [view.id]: Math.max(0, (prev[view.id] || 0) - 1)}))}>
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <Button variant="secondary" size="icon" className="h-8 w-8 rounded-full shadow-md pointer-events-auto" onClick={() => setActiveIndices(prev => ({...prev, [view.id]: Math.min(view.files!.length - 1, (prev[view.id] || 0) + 1)}))}>
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
                   )}
                 </>
               ) : (
-                // Vista simple (antigua)
-                view.type === 'video' ? <video src={view.url} controls className="max-h-full" /> : <img src={view.url} className="max-h-full object-contain" />
+                view.type === 'video' ? <video src={view.url} controls className="max-h-full w-full" /> : <img src={view.url} className="max-h-full w-full object-contain" />
               )}
             </div>
 
-            <div className="grid grid-cols-3 gap-3 text-sm">
-              <div>
-                <p className="text-xs text-muted-foreground">Tipo</p>
-                <p className="font-medium capitalize">{view.type}</p>
+            <div className="grid grid-cols-3 gap-2 text-[10px] sm:text-xs">
+              <div className="bg-muted/30 p-2 rounded-lg">
+                <p className="text-muted-foreground">Tipo</p>
+                <p className="font-semibold capitalize">{view.type}</p>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Tamaño</p>
-                <p className="font-medium">{formatBytes(view.size)}</p>
+              <div className="bg-muted/30 p-2 rounded-lg">
+                <p className="text-muted-foreground">Tamaño</p>
+                <p className="font-semibold">{formatBytes(view.size)}</p>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Subido</p>
-                <p className="font-medium">
-                  {view.uploaded_at ? formatDate(view.uploaded_at) : 'Fecha no disponible'}
-                </p>
+              <div className="bg-muted/30 p-2 rounded-lg">
+                <p className="text-muted-foreground">Subido</p>
+                <p className="font-semibold">{view.uploaded_at ? formatDate(view.uploaded_at) : '—'}</p>
               </div>
             </div>
-              {view.comment && <p className="text-sm italic border-l-2 border-primary pl-3">"{view.comment}"</p>}          </>}
+            {view.comment && <p className="text-xs italic border-l-2 border-primary pl-3 mt-2 text-muted-foreground">"{view.comment}"</p>}
+          </>}
         </DialogContent>
       </Dialog>
 
-      {/* Comment */}
+      {/* COMMENT MODAL RESPONSIVO */}
       <Dialog open={!!commentToEdit} onOpenChange={() => setCommentToEdit(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>Comentar evidencia</DialogTitle></DialogHeader>
+        <DialogContent className="max-w-[90vw] sm:max-w-md rounded-xl">
+          <DialogHeader><DialogTitle className="text-base">Comentar evidencia</DialogTitle></DialogHeader>
           <Textarea 
             rows={4} 
             value={commentToEdit?.text || ''} 
             onChange={e => setCommentToEdit(c => c ? { ...c, text: e.target.value } : c)} 
             placeholder="Escribe un comentario técnico..." 
+            className="text-sm"
           />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCommentToEdit(null)}>Cancelar</Button>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setCommentToEdit(null)} className="w-full sm:w-auto">Cancelar</Button>
             <Button onClick={() => { 
               if (commentToEdit) { 
                 commentEvidence(commentToEdit.id, commentToEdit.text); 
                 toast.success('Comentario guardado'); 
                 setCommentToEdit(null); 
               } 
-            }} className="bg-gradient-primary text-primary-foreground">Guardar</Button>
+            }} className="bg-gradient-primary text-primary-foreground w-full sm:w-auto">Guardar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

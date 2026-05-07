@@ -34,44 +34,51 @@ const AdminPage = () => {
         actions={<Button variant="outline" onClick={() => { reset(); toast.success('Datos restablecidos'); }}><Settings className="h-4 w-4 mr-2" />Restablecer demo</Button>} />
 
       <div className="grid lg:grid-cols-2 gap-6">
-        <div className="rounded-xl border bg-card shadow-card">
+        <div className="rounded-xl border bg-card shadow-card overflow-hidden"> {/* overflow-hidden para que los bordes redondeados se mantengan */}
           <div className="p-4 border-b flex items-center justify-between">
             <h3 className="font-display font-semibold">Tipos de incidencia</h3>
             <Button size="sm" onClick={openNew} className="bg-gradient-primary text-primary-foreground"><Plus className="h-4 w-4 mr-1" />Nuevo</Button>
           </div>
-          <Table>
-            <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Severidad</TableHead><TableHead>Estado</TableHead><TableHead></TableHead></TableRow></TableHeader>
-            <TableBody>
-              {failureTypes.map(f => (
-                <TableRow key={f.id}>
-                  <TableCell className="font-medium">{f.name}</TableCell>
-                  <TableCell><span className="text-xs px-2 py-0.5 rounded bg-muted capitalize">{f.severity}</span></TableCell>
-                  <TableCell><Switch checked={f.active} onCheckedChange={() => { toggleFailureType(f.id); toast.success('Estado actualizado'); }} /></TableCell>
-                  <TableCell><Button size="icon" variant="ghost" onClick={() => openEdit(f.id)}><Pencil className="h-4 w-4" /></Button></TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          {/* MEJORA RESPONSIVE: Contenedor con scroll horizontal */}
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Severidad</TableHead><TableHead>Estado</TableHead><TableHead></TableHead></TableRow></TableHeader>
+              <TableBody>
+                {failureTypes.map(f => (
+                  <TableRow key={f.id}>
+                    <TableCell className="font-medium">{f.name}</TableCell>
+                    <TableCell><span className="text-xs px-2 py-0.5 rounded bg-muted capitalize">{f.severity}</span></TableCell>
+                    <TableCell><Switch checked={f.active} onCheckedChange={() => { toggleFailureType(f.id); toast.success('Estado actualizado'); }} /></TableCell>
+                    <TableCell><Button size="icon" variant="ghost" onClick={() => openEdit(f.id)}><Pencil className="h-4 w-4" /></Button></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </div>
 
-        <div className="rounded-xl border bg-card shadow-card">
+        <div className="rounded-xl border bg-card shadow-card overflow-hidden">
           <div className="p-4 border-b"><h3 className="font-display font-semibold">Estados del caso</h3></div>
-          <Table>
-            <TableHeader><TableRow><TableHead>Estado</TableHead><TableHead>Clave</TableHead><TableHead>Activo</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {statuses.map(s => (
-                <TableRow key={s.id}>
-                  <TableCell className="font-medium">{s.label}</TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground">{s.key}</TableCell>
-                  <TableCell><Switch checked={s.active} onCheckedChange={() => { toggleStatus(s.id); toast.success('Estado actualizado'); }} /></TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          {/* MEJORA RESPONSIVE: Contenedor con scroll horizontal */}
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader><TableRow><TableHead>Estado</TableHead><TableHead>Clave</TableHead><TableHead>Activo</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {statuses.map(s => (
+                  <TableRow key={s.id}>
+                    <TableCell className="font-medium">{s.label}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{s.key}</TableCell>
+                    <TableCell><Switch checked={s.active} onCheckedChange={() => { toggleStatus(s.id); toast.success('Estado actualizado'); }} /></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </div>
 
         <div className="rounded-xl border bg-card shadow-card p-5 lg:col-span-2">
           <h3 className="font-display font-semibold mb-3">Criterios básicos de garantía</h3>
+          {/* grid sm:grid-cols-2 ya maneja bien el responsive aquí */}
           <div className="grid sm:grid-cols-2 gap-3 text-sm">
             {[
               'Comprobante de compra válido y vigente',
@@ -83,7 +90,7 @@ const AdminPage = () => {
             ].map((c, i) => (
               <div key={i} className="flex items-center gap-2 p-3 rounded-lg border bg-background">
                 <Switch defaultChecked />
-                <span>{c}</span>
+                <span className="leading-tight">{c}</span>
               </div>
             ))}
           </div>
@@ -91,7 +98,8 @@ const AdminPage = () => {
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        {/* max-w-[90vw] asegura que el modal no se corte en teléfonos muy pequeños */}
+        <DialogContent className="sm:max-w-[425px] max-w-[95vw] rounded-xl">
           <DialogHeader><DialogTitle>{editing ? 'Editar' : 'Nuevo'} tipo de incidencia</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
             <div><Label>Nombre</Label><Input value={name} onChange={e => setName(e.target.value)} /></div>
@@ -99,7 +107,10 @@ const AdminPage = () => {
               <SelectItem value="baja">Baja</SelectItem><SelectItem value="media">Media</SelectItem><SelectItem value="alta">Alta</SelectItem>
             </SelectContent></Select></div>
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button><Button onClick={submit} className="bg-gradient-primary text-primary-foreground">Guardar</Button></DialogFooter>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+            <Button onClick={submit} className="bg-gradient-primary text-primary-foreground">Guardar</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
