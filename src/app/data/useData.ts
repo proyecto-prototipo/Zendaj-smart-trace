@@ -189,6 +189,8 @@ export const useData = create<DataStore>()(
 
 
       updateCaseStatus: async (id, status) => {
+        const currentCase = get().cases.find(c => c.id === id);
+        const fromStatus = currentCase ? currentCase.status : null;
 
         const { error } = await supabase
           .from('cases')
@@ -203,19 +205,39 @@ export const useData = create<DataStore>()(
           return;
         }
 
+        const sessionData = JSON.parse(localStorage.getItem('zendaj-auth') || '{}');
+        const actorName = sessionData?.state?.session?.name || 'Sistema';
+        const actorRole = sessionData?.state?.session?.role || 'asesor';
+
+        const { error: historyError } = await supabase
+          .from('case_history')
+          .insert([{
+            case_id: id,
+            action: 'Cambio de estado',
+            user_name: actorName,
+            user_role: actorRole,
+            comment: `El caso cambió de estado de ${fromStatus ? fromStatus.replace('_',' ') : '—'} a ${status.replace('_',' ')}`,
+            from_status: fromStatus,
+            to_status: status
+          }]);
+
+        if (historyError) {
+          console.error("Error al guardar en el historial:", historyError.message);
+        }
         await get().fetchData();
       },
 
-      addCaseComment: async (id, comment, actor) => {
+      addCaseComment: async (id, comment, actor, extra = {}) => {
 
         const { error } = await supabase
           .from('case_history') 
           .insert([{
-            case_id: id,            // Debe ser UUID
-            action: 'Comentario añadido',
+            case_id: id,
+            action: extra.action || 'Comentario añadido', // Usa la acción enviada o por defecto
             user_name: actor.name,
             user_role: actor.role,
-            comment: comment
+            comment: comment,
+            to_status: extra.toStatus || null // Guarda el nuevo estado si existe
           }]);
 
         if (error) {

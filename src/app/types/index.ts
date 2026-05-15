@@ -61,6 +61,7 @@ export interface HistoryEntry {
   comment?: string;
   user_name?: string;  
   user_role?: string;  
+  from_status?: string;
   to_status?: string;  
   created_at?: string; 
 }

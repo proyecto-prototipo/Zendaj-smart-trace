@@ -88,10 +88,16 @@ const TrazabilidadPage = () => {
 
   const onChangeStatus = async () => {
     if (!statusChange) return;   
-    await updateCaseStatus(c.id, statusChange || undefined);
+
+    await updateCaseStatus(c.id, statusChange);
+
+    if (comment.trim()) {
     await addCaseComment(c.id, comment, { name: session.name, role: session.role });
-    toast.success(`Estado cambiado`);
-    setStatusChange(''); setComment('');
+    }
+
+    toast.success(`Estado actualizado`);
+    setStatusChange(''); 
+    setComment('');
   };
 
   const onComment = () => {
@@ -171,7 +177,10 @@ const TrazabilidadPage = () => {
                   <div className="absolute -left-[23px] sm:-left-[18px] top-1 h-3 w-3 rounded-full bg-primary ring-4 ring-background" />
                   <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-1">
                     <p className="text-sm font-bold">{h.action}</p>
-                    {(h.toStatus || (h as any).to_status) && <StatusBadge status={(h.toStatus || (h as any).to_status) as CaseStatus} />}
+                    {/* Renderizado dinámico del Badge usando la nomenclatura de Supabase */}
+                    {h.to_status && (
+                      <StatusBadge status={h.to_status as CaseStatus} />
+                    )}
                   </div>
                   {h.comment && <p className="text-xs sm:text-sm text-muted-foreground bg-muted/20 p-2 rounded-md italic">"{h.comment}"</p>}
                   <div className="flex items-center gap-2 mt-2 text-[10px] text-muted-foreground">
