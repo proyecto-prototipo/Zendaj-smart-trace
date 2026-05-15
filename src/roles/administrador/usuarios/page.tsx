@@ -114,11 +114,11 @@ const UsersPage = () => {
             <TableHeader>
               <TableRow>
                 <TableHead className="min-w-[200px]">Persona</TableHead>
-                <TableHead className="hidden md:table-cell">Documento</TableHead>
-                <TableHead className="hidden sm:table-cell">Contacto</TableHead>
+                <TableHead>Documento</TableHead>
+                <TableHead>Contacto</TableHead>
                 <TableHead>Rol</TableHead>
-                <TableHead className="hidden lg:table-cell">Tipo</TableHead>
-                <TableHead className="hidden xl:table-cell">Registro</TableHead>
+                <TableHead>Tipo</TableHead>
+                <TableHead>Registro</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
@@ -142,12 +142,12 @@ const UsersPage = () => {
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="font-mono text-[10px] sm:text-xs hidden md:table-cell">{u.document}</TableCell>
-                  <TableCell className="text-xs sm:text-sm hidden sm:table-cell">{u.phone}</TableCell>
+                  <TableCell className="font-mono text-[10px] sm:text-xs">{u.document}</TableCell>
+                  <TableCell className="text-xs sm:text-sm">{u.phone}</TableCell>
                   <TableCell>
                     <span className="text-[10px] sm:text-sm">{roleLabels[u.role]}</span>
                   </TableCell>
-                  <TableCell className="hidden lg:table-cell">
+                  <TableCell>
                     <span className={cn(
                       "text-[10px] px-2 py-1 rounded-md font-medium",
                       u.type === 'interno' ? 'bg-primary/10 text-primary' : 'bg-accent/10 text-accent'
@@ -155,13 +155,13 @@ const UsersPage = () => {
                       {u.type === 'interno' ? 'Interno' : 'Cliente'}
                     </span>
                   </TableCell>
-                  <TableCell className="text-[10px] sm:text-xs text-muted-foreground hidden xl:table-cell">
+                  <TableCell className="text-[10px] sm:text-xs text-muted-foreground">
                     {formatDate(u.created_at || (u as any).createdAt)}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Switch className="scale-75 sm:scale-100" checked={u.active} onCheckedChange={async () => { await toggleUserActive(u.id); toast.success('Estado actualizado'); }} />
-                      <span className={cn("text-[10px] hidden sm:inline", u.active ? 'text-success' : 'text-muted-foreground')}>
+                      <span className={cn("text-[10px]", u.active ? 'text-success' : 'text-muted-foreground')}>
                         {u.active ? 'Activo' : 'Inactivo'}
                       </span>
                     </div>
