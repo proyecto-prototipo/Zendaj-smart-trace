@@ -16,7 +16,7 @@ import { Switch } from '@/app/ui/switch';
 import { formatDate } from '@/app/format/format';
 import { cn } from '@/app/lib/utils';
 
-const blank: Omit<User, 'id' | 'createdAt'> = { name: '', email: '', document: '', phone: '', role: 'cliente', type: 'cliente', active: true };
+const blank: Omit<User, 'id' | 'created_at'> = { name: '', email: '', document: '', phone: '', role: 'cliente', type: 'cliente', active: true };
 
 const UsersPage = () => {
   const { users, addUser, updateUser, toggleUserActive, fetchData } = useData();
@@ -155,7 +155,9 @@ const UsersPage = () => {
                       {u.type === 'interno' ? 'Interno' : 'Cliente'}
                     </span>
                   </TableCell>
-                  <TableCell className="text-[10px] sm:text-xs text-muted-foreground hidden xl:table-cell">{formatDate(u.createdAt)}</TableCell>
+                  <TableCell className="text-[10px] sm:text-xs text-muted-foreground hidden xl:table-cell">
+                    {formatDate(u.created_at || (u as any).createdAt)}
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Switch className="scale-75 sm:scale-100" checked={u.active} onCheckedChange={async () => { await toggleUserActive(u.id); toast.success('Estado actualizado'); }} />
