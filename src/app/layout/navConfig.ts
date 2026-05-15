@@ -1,5 +1,5 @@
 import { Role } from '@/app/types';
-import { LayoutDashboard, Users, ShoppingBag, AlertTriangle, FileImage, ShieldCheck, GitBranch, Settings, BarChart3, FolderOpen, ListChecks, ClipboardList, History, FilePlus2, Home, PieChart, TrendingUp, Sparkles } from 'lucide-react';
+import { LayoutDashboard,FileText, Users, ShoppingBag, AlertTriangle, FileImage, ShieldCheck, GitBranch, Settings, BarChart3, FolderOpen, ListChecks, ClipboardList, History, FilePlus2, Home, PieChart, TrendingUp, Sparkles } from 'lucide-react';
 
 export interface NavItem {
   label: string;
@@ -18,6 +18,7 @@ export const navByRole: Record<Role, NavItem[]> = {
     { label: 'Validación de garantía', to: '/app/garantias', icon: ShieldCheck, group: 'Operación' },
     { label: 'Trazabilidad', to: '/app/trazabilidad', icon: GitBranch, group: 'Operación' },
     { label: 'Administración', to: '/app/administracion', icon: Settings, group: 'Sistema' },
+    { label: 'Manual de usuario', to: '/app/manual-de-usuario', icon: FileText, group: 'Sistema' },
   ],
   asesor: [
     { label: 'Dashboard operativo', to: '/app/dashboard', icon: LayoutDashboard, group: 'General' },

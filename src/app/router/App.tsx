@@ -19,7 +19,7 @@ import AdminEvidencias from "@/roles/administrador/evidencias";
 import AdminGarantias from "@/roles/administrador/validacion-garantia";
 import AdminTrazabilidad from "@/roles/administrador/trazabilidad";
 import AdminConfig from "@/roles/administrador/administracion";
-
+import AdminManualUsuario from "@/roles/administrador/manual-de-usuario/page";
 import ClienteHome from "@/roles/cliente/dashboard";
 import ClienteNuevo from "@/roles/cliente/registrar-incidencia";
 import ClienteReclamos from "@/roles/cliente/mis-reclamos";
@@ -58,6 +58,7 @@ const App = () => (
             <Route path="trazabilidad" element={<AdminTrazabilidad />} />
             <Route path="trazabilidad/:id" element={<AdminTrazabilidad />} />
             <Route path="administracion" element={<AdminConfig />} />
+            <Route path="manual-de-usuario" element={<AdminManualUsuario />} />
 
             {/* Cliente */}
             <Route path="cliente" element={<ClienteHome />} />
